@@ -1,0 +1,424 @@
+0001   0000             
+0002   0000             ;************************************************
+0003   0000             ; 8039 Quarz = 3,6864 Mhz                       *
+0004   0000             ; f = 3,6864 Mhz / 3 = 1,2288 Mhz               *
+0005   0000             ; ALE = CLK / 5 = 245,76 kHz = 4,069 us         *
+0006   0000             ; TCLK int = ALE / 32 = 7,68 kHz = 130,2083 us  *
+0007   0000             ; 1 cyc = 4,069 us                              *
+0008   0000             ; 1 timer tick = 130 us                         *
+0009   0000             ; Syntax: Telemark TASM Version 3.2             *
+0010   0000             ;************************************************
+0011   0000             
+0012   0000             #include "mc1000.inc";
+0001+  0000             
+0002+  0000             NUL	= $00	; null value
+0003+  0000             CR	= $0d	; Carrage return
+0004+  0000             LF	= $0A	; Line feed
+0005+  0000             
+0006+  0000             b_WD	= $80	; watchdog bit
+0007+  0000             
+0008+  0000             ZP_SW1	= $20	; result of switch #1 (call rdSW12)
+0009+  0000             ZP_SW2	= $21	; result of switch #2 (call rdSW12)
+0010+  0000             ZP_22	= $22	; rescue 8b (b82HEX))
+0011+  0000             ZP_LNIB	= $23	; low nibble result of 8b
+0012+  0000             ZP_HNIB	= $24	; high nibble result of 8b
+0013+  0000             ZP_25	= $25	; working nibble result
+0014+  0000             ZP_26	= $26	; last pressed raw key 7279
+0015+  0000             
+0016+  0000             
+0017+  0000             
+0013   0000             #include "io.inc";
+0001+  0000             
+0002+  0000             
+0003+  0000             IO_CD		= $03 ; P13
+0004+  0000             IO_RESET	= $04 ; P14, active high
+0005+  0000             
+0014   0000             #include "i2c.inc";
+0001+  0000             
+0002+  0000             SCL = 0	; P10
+0003+  0000             SDA = 1	; P11
+0004+  0000             
+0005+  0000             
+0015   0000             
+0016   0000             
+0017   0000             
+0018   0000             .org 0000h
+0019   0000             
+0020   0000 04 20       _RESET		jmp INIT	; reset sprungadresse
+0021   0002 00          		nop
+0022   0003 04 A9       _INT		jmp INTERRUPT	; interrupt sprungadresse
+0023   0005 00          		nop
+0024   0006 00          		nop
+0025   0007 04 A0       _TINT		jmp TIMERINT	; timer interrupt sprungadresse
+0026   0009 00          		nop
+0027   000A             
+0028   0010             .org 0010h
+0029   0010             	; Platz fuer 16 Byte EPROM ID
+0030   0010 30 31 32 33 	.byte	"0123456789abcdef"
+0030   0014 34 35 36 37 
+0030   0018 38 39 61 62 
+0030   001C 63 64 65 66 
+0031   0020             	
+0032   0020             	; ---------------- init --------------------
+0033   0020 15          INIT	dis i		; (1 cyc) interrupt verhindern
+0034   0021 35          	dis tcnti	; (1 cyc) timer interrupt verhindern
+0035   0022 75          	ent0 clk	; (1 cyc) T0 prozessortakt ausgeben
+0036   0023             	
+0037   0023 14 66       	call I2CINIT	; init i2c - SDA and SCL high
+0038   0025             	
+0039   0025             x0	
+0040   0025             	;call rdSW12	; read SW1 & SW2
+0041   0025             	
+0042   0025 14 69       	call I2CSTART	;
+0043   0027             	
+0044   0027             	; i2c address byte
+0045   0027             	;mov r0,#$ZP_SW1	; SW1 i2c address
+0046   0027             	;mov a,@r0	; i2c 7-bit address
+0047   0027 23 FF       	mov a,#$ff	; i2c 7-bit address
+0048   0029 85          	clr F0		; set write mode
+0049   002A             	;cpl F0		; set read mode
+0050   002A A5          	clr F1		; set data  mode
+0051   002B B5          	cpl F1		; set address mode
+0052   002C 14 40       	call IC2OUT
+0053   002E             	
+0054   002E             	
+0055   002E             	; i2c data byte
+0056   002E             	;mov r0,#$ZP_SW2	; SW2 i2c data
+0057   002E             	;mov a,@r0	; i2c 8-bit data
+0058   002E 23 AA       	mov a,#$(%10101010)	; i2c 8-bit data
+0059   0030 85          	clr F0		; set write mode
+0060   0031 A5          	clr F1		; set data  mode
+0061   0032 14 40       	call IC2OUT
+0062   0034             	
+0063   0034 23 55       	mov a,#$(%01010101)	; i2c 8-bit data
+0064   0036 85          	clr F0		; set write mode
+0065   0037 A5          	clr F1		; set data  mode
+0066   0038 14 40       	call IC2OUT
+0067   003A             	
+0068   003A 14 70       	call I2CSTOP
+0069   003C             	
+0070   003C 14 9B       	call WATCHDOG
+0071   003E             	;jmp $
+0072   003E 04 25       	jmp x0
+0073   0040             
+0074   0040             
+0075   0040             
+0076   0040             
+0077   0040             ;*****************************************
+0078   0040             ; I2C write out address/date
+0079   0040             ; SDA & SCL should be low before
+0080   0040             ; data must be stable before and after clock
+0081   0040             ; A= address/data -> R3
+0082   0040             ; r0= temp bitcounter
+0083   0040             ; r3= temp address/data
+0084   0040             ; F0= set r/w mode 1/0
+0085   0040             ; F1= address/data 1/0
+0086   0040             ;*****************************************
+0087   0040             IC2OUT
+0088   0040 B8 08       	mov r0,#$08	; set bitcounter to 8-bit
+0089   0042 76 46       	jf1 I2CB00	; F1=1 7-bit address mode + 1-bit RW
+0090   0044 04 4D       	jmp I2CB01	; F1=0 8-bit data mode
+0091   0046             	
+0092   0046             	; adapt to address + R/W
+0093   0046 E7          I2CB00	rl a		; convert A to address << 1
+0094   0047 B6 4B       	jf0 I2CB0A	; set to read b0=1
+0095   0049 04 4D       	jmp I2CB01	; set to write b0=0 (allready done by shift left)
+0096   004B 43 01       I2CB0A	orl a,#$01	; set to write
+0097   004D             
+0098   004D             	; SDA & SCL should here be low
+0099   004D             	; loop over 8-bit adress+RW/data
+0100   004D AB          I2CB01	mov r3,a	; set A to temp adress/data
+0101   004E 97          	clr c		; prerpare carry
+0102   004F FB          	mov a,r3	; load temp adress/data
+0103   0050 F7          	rlc a		; shift bit out into carry
+0104   0051 F6 55       	jc I2CB1	; bit set
+0105   0053 04 57       	jmp I2CB2	; bit clear
+0106   0055 89 02       I2CB1	orl p1,#$(1 << SDA) ; SDA high, bit rising
+0107   0057 89 01       I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
+0108   0059 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
+0109   005B 99 FD       	anl p1,#~(1 << SDA) ; SDA low, bit falling
+0110   005D E8 4D       	djnz r0,I2CB01	; decrement bitcounter,next loop r0>0
+0111   005F             	
+0112   005F             	; check bit-9 AKN/NAKN
+0113   005F 89 01       	orl p1,#$(1 << SCL) ; SCL high, clock rising
+0114   0061 09          	in a,p1		; read P1x
+0115   0062 00          	nop		; carry to be define
+0116   0063 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
+0117   0065             	
+0118   0065 83          	ret
+0119   0066             
+0120   0066             
+0121   0066             ;*****************************************
+0122   0066             ; I2C write out address/date
+0123   0066             ; data must be stable before and after clock
+0124   0066             ; A= address/data
+0125   0066             ; r0= temp bitcounter
+0126   0066             ; r3= temp address/data
+0127   0066             ; F0= set r/w mode 1/0
+0128   0066             ; F1= address/data 1/0
+0129   0066             ;*****************************************
+0130   0066             ;yIC2OUT
+0131   0066             ;	;anl p1,#~(1 << SDA|1 << SCL)	; SDA & SCL low
+0132   0066             ;	jf1 I2CB00	; F1=1 7-bit address mode
+0133   0066             ;	mov r0,#$08	; set bitcounter to 8-bit data mode
+0134   0066             ;	jmp I2CB01	; data mode - leave A as it is
+0135   0066             ;yI2CB00	rl a		; convert A to address << 1
+0136   0066             ;	mov r0,#$07	; set bitcounter to 7-bit address mode
+0137   0066             ;yI2CB01	mov r3,a	; set address/data
+0138   0066             ;	
+0139   0066             ;	; SDA & SCL should here be low
+0140   0066             ;	
+0141   0066             ;yI2CB0	clr c
+0142   0066             ;	mov a,r3	; load temp adress/data
+0143   0066             ;	rlc a		; check bit
+0144   0066             ;	jc I2CB1	; bit set
+0145   0066             ;	orl p1,#$(1 << SCL)	; SCL high & SDA should be
+0146   0066             ;	jmp I2CB2	; bit clear
+0147   0066             ;yI2CB1	orl p1,#$(1 << SDA)|(1 << SCL) ; SDA and SCL high
+0148   0066             ;yI2CB2	anl p1,#~((1 << SDA)|(1 << SCL)) ; SDA & SCL low
+0149   0066             ;	mov r3,a	; save current address value
+0150   0066             ;	djnz r0,I2CB0	; decrement bitcounter
+0151   0066             ;	
+0152   0066             ;	jf1 I2CB30	; F1=1 7-bit address mode elected
+0153   0066             ;	jmp I2CB4	; 8-bit data mode elected
+0154   0066             ;	
+0155   0066             ;	; set r/w mode on address mode only
+0156   0066             ;yI2CB30	jf0 I2CB3	; F0=1 write mode
+0157   0066             ;	orl p1,#$(1 << SCL) ; SCL high
+0158   0066             ;	jmp I2CB4
+0159   0066             ;yI2CB3	orl p1,#$(1 << SDA)|(1 << SCL) ; SDA and SCL high
+0160   0066             ;	
+0161   0066             ;yI2CB4	anl p1,#~((1 << SDA)|(1 << SCL)	; SDA & SCL low
+0162   0066             ;	
+0163   0066             ;	; bit 9, read AKN/NAKN in A
+0164   0066             ;	orl p1,#$(1 << SCL) ; SCL high
+0165   0066             ;	in a,p1		; read P1
+0166   0066             ;	nop		; carry to be define
+0167   0066             ;	anl p1,#~(1 << SCL)	; SCL low
+0168   0066             ;	
+0169   0066             ;	ret
+0170   0066             
+0171   0066             
+0172   0066             ;*****************************************
+0173   0066             ; I2C write out address/date
+0174   0066             ; A= address/data
+0175   0066             ; r0= temp bitcounter
+0176   0066             ; r3= temp address/data
+0177   0066             ; F0= set r/w mode 1/0
+0178   0066             ; F1= address/data 1/0
+0179   0066             ;*****************************************
+0180   0066             ;xIC2OUT
+0181   0066             ;	;anl p1,#~(1 << SDA|1 << SCL)	; SDA & SCL low
+0182   0066             ;	jf1 I2CB00	; F1=1 7-bit address mode
+0183   0066             ;	mov r0,#$08	; set bitcounter to 8-bit data mode
+0184   0066             ;	jmp I2CB01	; data mode - leave A as it is
+0185   0066             ;xI2CB00	rl a		; convert A to address << 1
+0186   0066             ;	mov r0,#$07	; set bitcounter to 7-bit address mode
+0187   0066             ;xI2CB01	mov r3,a	; set address/data
+0188   0066             ;	
+0189   0066             ;	; SDA & SCL should here be low
+0190   0066             ;	
+0191   0066             ;xI2CB0	clr c
+0192   0066             ;	mov a,r3	; load temp adress/data
+0193   0066             ;	rlc a		; check bit
+0194   0066             ;	jc I2CB1	; bit set
+0195   0066             ;	orl p1,#$(1 << SCL)	; SCL high & SDA should be
+0196   0066             ;	jmp I2CB2	; bit clear
+0197   0066             ;xI2CB1	orl p1,#$(1 << SDA)|(1 << SCL) ; SDA and SCL high
+0198   0066             ;xI2CB2	anl p1,#~((1 << SDA)|(1 << SCL)) ; SDA & SCL low
+0199   0066             ;	mov r3,a	; save current address value
+0200   0066             ;	djnz r0,I2CB0	; decrement bitcounter
+0201   0066             ;	
+0202   0066             ;	jf1 I2CB30	; F1=1 7-bit address mode elected
+0203   0066             ;	jmp I2CB4	; 8-bit data mode elected
+0204   0066             ;	
+0205   0066             ;	; set r/w mode on address mode only
+0206   0066             ;xI2CB30	jf0 I2CB3	; F0=1 write mode
+0207   0066             ;	orl p1,#$(1 << SCL) ; SCL high
+0208   0066             ;	jmp I2CB4
+0209   0066             ;xI2CB3	orl p1,#$(1 << SDA)|(1 << SCL) ; SDA and SCL high
+0210   0066             ;	
+0211   0066             ;xI2CB4	anl p1,#~((1 << SDA)|(1 << SCL)	; SDA & SCL low
+0212   0066             ;	
+0213   0066             ;	; bit 9, read AKN/NAKN in A
+0214   0066             ;	orl p1,#$(1 << SCL) ; SCL high
+0215   0066             ;	in a,p1		; read P1
+0216   0066             ;	nop		; carry to be define
+0217   0066             ;	anl p1,#~(1 << SCL)	; SCL low
+0218   0066             ;	
+0219   0066             ;	ret
+0220   0066             
+0221   0066             
+0222   0066             ;*****************************************
+0223   0066             ; I2C init sequence
+0224   0066             ;*****************************************
+0225   0066             I2CINIT	
+0226   0066 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
+0227   0068 83          	ret
+0228   0069             
+0229   0069             
+0230   0069             ;*****************************************
+0231   0069             ; I2C start sequence
+0232   0069             ; SDA & SCL should be low before
+0233   0069             ;*****************************************
+0234   0069             I2CSTART
+0235   0069 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
+0236   006B 99 FD       	anl p1,#~(1 << SDA)		; SDA low, SCL high
+0237   006D 99 FC       	anl p1,#~((1 << SDA)|(1 << SCL)) ; SDA & SCL low
+0238   006F 83          	ret				;
+0239   0070             
+0240   0070             
+0241   0070             ;*****************************************
+0242   0070             ; I2C start sequence
+0243   0070             ; SDA & SCL should be low before
+0244   0070             ;*****************************************
+0245   0070             I2CSTOP
+0246   0070 89 01       	orl p1,#$(1 << SCL)		; SCL high
+0247   0072 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
+0248   0074 83          	ret				;
+0249   0075             
+0250   0075             
+0251   0075             
+0252   0075             ;************************************************
+0253   0075             ; Load SW1/SW2
+0254   0075             ; R3/R4= temporary result of SW1/SW2
+0255   0075             ; $20= result of SW1
+0256   0075             ; $21= result of SW2
+0257   0075             ;************************************************
+0258   0075             rdSW12:
+0259   0075 23 10       	mov	a,#$10		; init value-corunter
+0260   0077 AA          	mov	r2,a		; with %00010000
+0261   0078             	;mov	r3,#$00
+0262   0078             L0332:
+0263   0078 FB          	mov	a,r3		; move SW1 counter from r3
+0264   0079 AC          	mov	r4,a		; to SW2 counter r4
+0265   007A             L0334:
+0266   007A CA          	dec	r2		; value-counter r2--
+0267   007B 09          	in	a,p1		; load current value of port1
+0268   007C 53 F0       	anl	a,#$F0		; cut low nibble
+0269   007E 4A          	orl	a,r2		; "add" value-counter r2 into
+0270   007F             	
+0271   007F 43 03       	orl	a,#$(1<<SCL)|(1 << SDA)
+0272   0081             	
+0273   0081 39          	outl	p1,a		; write back to port1
+0274   0082 FB          	mov	a,r3		; load A with r3
+0275   0083 97          	clr	c		; clear carry
+0276   0084 56 87       	jt1	L033F		; SW is "On"?
+0277   0086 A7          	cpl	c		; set carry (inverted val)
+0278   0087             L033F:
+0279   0087 F7          	rlc	a		; fill value with carry from right
+0280   0088 AB          	mov	r3,a		; store result to counter r3
+0281   0089 FA          	mov	a,r2		; load counter r2
+0282   008A 72 78       	jb3	L0332		; bit 3 set (SW2 active)?
+0283   008C 53 0F       	anl	a,#$0F		; cut high nibble
+0284   008E C6 92       	jz	L034A		; value-counter clear
+0285   0090 04 7A       	jmp	L0334		; next loop, SW counter -> r4
+0286   0092             L034A:
+0287   0092 B8 20       	mov	r0,#ZP_SW1	; set index ZP $20
+0288   0094 FB          	mov	a,r3		; store result from r3
+0289   0095 A0          	mov	@r0,a		; to RAM $20
+0290   0096 B8 21       	mov	r0,#ZP_SW2	; set index ZP $21
+0291   0098 FC          	mov	a,r4		; store result from r4
+0292   0099 A0          	mov	@r0,a		; to RAM $21
+0293   009A 83          	ret			; bye
+0294   009B             
+0295   009B             
+0296   009B             ;*****************************************
+0297   009B             ; watchdog impuls |_|- high->low -> high *
+0298   009B             ; must be execute at least each ~630ms   *
+0299   009B             ;*****************************************
+0300   009B             WATCHDOG:
+0301   009B 9A 7F       	anl p2,#$(~b_WD)	; (2 cyc) P27 Watchdog low
+0302   009D 8A 80       	orl p2,#b_WD		; (2 cyc) P27 Watchdog high
+0303   009F 83          	ret			; (2 cyc)
+0304   00A0             
+0305   00A0             
+0306   00A0             
+0307   00A0             ;***********************************************
+0308   00A0             ; Timer interrupt routine alle 10,02 ms        *
+0309   00A0             ;***********************************************
+0310   00A0             TIMERINT:
+0311   00A0 93          	retr
+0312   00A1             	
+0313   00A1             	
+0314   00A1 23 B3       	mov a,#0b3h		; (1 cyc) 9,8 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
+0315   00A3 62          	mov t,a			; (1 cyc) timer mit akkuwert laden
+0316   00A4 09          	in a,p1			; (2 cyc) lese port #1 in kku
+0317   00A5 D3 80       	xrl a,#b_WD		; (2 cyc) XOR akku mit bit 7
+0318   00A7 39          	outl p1,a		; (2 cyc) schreibe akku nach port #1
+0319   00A8 93          	retr			; (2 cyc) return mit PSW restore
+0320   00A9             
+0321   00A9             ;***********************************************
+0322   00A9             ; interrupt routine                            *
+0323   00A9             ;***********************************************
+0324   00A9             INTERRUPT:
+0325   00A9 93          	retr			;
+0326   00AA             
+0327   00AA             
+0328   00AA             
+0329   00AA             .end
+0330   00AA             
+
+
+
+Type Key: N=NULL_SEG C=CODE_SEG B=BIT_SEG X=EXTD_SEG D=DATA_SEG
+          L=Local
+          E=Export
+
+Value    Type   Label
+-----    ----   ------------------------------
+000D     N      CR                              
+0003     N      IO_CD                           
+0004     N      IO_RESET                        
+0020     N      INIT                            
+0040     N      IC2OUT                          
+0046     N      I2CB00                          
+004B     N      I2CB0A                          
+004D     N      I2CB01                          
+0055     N      I2CB1                           
+0057     N      I2CB2                           
+0066     N      I2CINIT                         
+0069     N      I2CSTART                        
+0070     N      I2CSTOP                         
+00A9     N      INTERRUPT                       
+000A     N      LF                              
+0078     N      L0332                           
+007A     N      L0334                           
+0087     N      L033F                           
+0092     N      L034A                           
+0000     N      NUL                             
+0000     N      SCL                             
+0001     N      SDA                             
+00A0     N      TIMERINT                        
+009B     N      WATCHDOG                        
+0020     N      ZP_SW1                          
+0021     N      ZP_SW2                          
+0022     N      ZP_22                           
+0023     N      ZP_LNIB                         
+0024     N      ZP_HNIB                         
+0025     N      ZP_25                           
+0026     N      ZP_26                           
+0080     N      b_WD                            
+0000     NL     noname._RESET                   
+0003     NL     noname._INT                     
+0007     NL     noname._TINT                    
+0075     N      rdSW12                          
+0025     N      x0                              
+
+
+ADDR  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+-----------------------------------------------------
+0000  04 20 00 04 A9 00 00 04 A0 00 FF FF FF FF FF FF
+0010  30 31 32 33 34 35 36 37 38 39 61 62 63 64 65 66
+0020  15 35 75 14 66 14 69 23 FF 85 A5 B5 14 40 23 AA
+0030  85 A5 14 40 23 55 85 A5 14 40 14 70 14 9B 04 25
+0040  B8 08 76 46 04 4D E7 B6 4B 04 4D 43 01 AB 97 FB
+0050  F7 F6 55 04 57 89 02 89 01 99 FE 99 FD E8 4D 89
+0060  01 09 00 99 FE 83 89 03 83 89 03 99 FD 99 FC 83
+0070  89 01 89 03 83 23 10 AA FB AC CA 09 53 F0 4A 43
+0080  03 39 FB 97 56 87 A7 F7 AB FA 72 78 53 0F C6 92
+0090  04 7A B8 20 FB A0 B8 21 FC A0 83 9A 7F 8A 80 83
+00A0  93 23 B3 62 09 D3 80 39 93 93 FF FF FF FF FF FF
+
+
+tasm: Number of errors = 0
