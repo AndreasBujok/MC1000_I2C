@@ -37,25 +37,73 @@ INIT	dis i		; (1 cyc) interrupt verhindern
 	
 	call I2CINIT	; init i2c - SDA and SCL high
 	
-x0	;call rdSW12	; read SW1 & SW2
-	
-	call I2CSTART	;
+	call WATCHDOG
 	call WATCHDOG
 	
-	; i2c address byte
-	mov a,#LCDADDR	; i2c 7-bit LCD address
-	clr F0		; write mode
-	cpl F0		; read mode
-	clr F1		; set data  mode
-	cpl F1		; set address mode
-	call I2COUT
+x0	call I2CSTART	;
 	call WATCHDOG
 	
-	call I2CIN
+	mov r4,#$0a	; 10*10ms
+	call wait	
 	call WATCHDOG
+	
+	; Try 1
+	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
+	call I2COUT	;
+	mov a,#$(%00110101) ;
+	call I2COUT	;
+	mov a,#$(%00110001) ;
+	call I2COUT	;
+	
+	mov r4,#$01	; 1*10ms
+	call wait	
+	call WATCHDOG
+	
+	; Try 2
+	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
+	call I2COUT	;
+	mov a,#$(%00110101) ;
+	call I2COUT	;
+	mov a,#$(%00110001) ;
+	call I2COUT	;
+	
+	mov r4,#$01	; 1*10ms
+	call wait	
+	call WATCHDOG
+	
+	; Try 3
+	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
+	call I2COUT	;
+	mov a,#$(%00110101) ;
+	call I2COUT	;
+	mov a,#$(%00110001) ;
+	call I2COUT	;
+	
+	mov r4,#$01	; 1*10ms
+	call wait	
+	call WATCHDOG
+	
+	; set 4bit mode
+	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
+	call I2COUT	;
+	mov a,#$(%00100101) ;
+	call I2COUT	;
+	mov a,#$(%00100001) ;
+	call I2COUT	;
+	
+	mov r4,#$01	; 1*10ms
+	call wait	
+	call WATCHDOG
+	
+	call I2CSTOP	;
+	
+	call WATCHDOG
+	call WATCHDOG
+	
+	jmp $
 	
 	;call I2CSTOP
-	call I2CSTOP
+	call I2CIN
 	call WATCHDOG
 	call WATCHDOG
 	jmp x0
@@ -72,6 +120,23 @@ x0	;call rdSW12	; read SW1 & SW2
 	;call WATCHDOG
 	
 	;jmp x0
+
+
+;*****************************************
+; sekunde                                *
+; Da aufwaertszahler, muss die diff zum  *
+; ueberlauf als Wert gtenommen werden    *
+; r4= n * 10ms
+;*****************************************
+wait		mov a,#0b3h	; (1 cyc) 9,8 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
+		mov t,a		; (1 cyc) timer mit akkuwert laden
+		call WATCHDOG	;
+		strt t		; (1 cyc) timer starten
+sek_2		jtf sek_3	; (2 cyc) timer abgelaufen
+		jmp sek_2	; (2 cyc) warten bis timer abgelaufen
+sek_3		stop tcnt	; (1 cyc) timer anhalten
+		djnz r4,wait	; (2 cyc) repeat zaehler decrementieren
+		ret		; (2 cyc) bye
 
 
 ;*****************************************
@@ -118,21 +183,11 @@ I2CO03	mov a,r3	; lopad temp data
 ; A= address/data -> R3
 ; r0= temp bitcounter
 ; r3= temp address/data
-; F0= R/W 1/0
-; F1= address/data 1/0
 ;*****************************************
-I2COUT
+I2COUT	; SDA & SCL should here be low
+	
 	mov r0,#$08	; set bitcounter to 8-bit
-	jf1 I2CB00	; F1=1 7-bit address mode + 1-bit RW
-	jmp I2CB01	; F1=0 8-bit data mode
 	
-	; adapt to address + R/W
-I2CB00	rl a		; convert A to address << 1 and b0=0 (write)
-	jf0 I2CB00A	; read mode
-	jmp I2CB01	; write mode
-I2CB00A	orl a,#$01	; b0=1 (read)
-	
-	; SDA & SCL should here be low
 	; loop over 8-bit adress+RW/data
 I2CB01	mov r3,a	; set A to temp adress/data
 	clr c		; prerpare carry
@@ -153,6 +208,50 @@ I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
 	anl p1,#~(1 << SCL) ; SCL low, clock falling
 	
 	ret
+
+
+;;*****************************************
+;; I2C write out address/date
+;; SDA & SCL should be low before
+;; data must be stable before and after clock
+;; A= address/data -> R3
+;; r0= temp bitcounter
+;; r3= temp address/data
+;; F0= R/W 1/0
+;; F1= address/data 1/0
+;;*****************************************
+;I2COUT
+;	mov r0,#$08	; set bitcounter to 8-bit
+;	jf1 I2CB00	; F1=1 7-bit address mode + 1-bit RW
+;	jmp I2CB01	; F1=0 8-bit data mode
+;	
+;	; adapt to address + R/W
+;I2CB00	rl a		; convert A to address << 1 and b0=0 (write)
+;	jf0 I2CB00A	; read mode
+;	jmp I2CB01	; write mode
+;I2CB00A	orl a,#$01	; b0=1 (read)
+;	
+;	; SDA & SCL should here be low
+;	; loop over 8-bit adress+RW/data
+;I2CB01	mov r3,a	; set A to temp adress/data
+;	clr c		; prerpare carry
+;	mov a,r3	; load temp adress/data
+;	rlc a		; shift bit out into carry
+;	jc I2CB1	; bit set
+;	jmp I2CB2	; bit clear
+;I2CB1	orl p1,#$(1 << SDA) ; SDA high, bit rising
+;I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
+;	anl p1,#~(1 << SCL) ; SCL low, clock falling
+;	anl p1,#~(1 << SDA) ; SDA low, bit falling
+;	djnz r0,I2CB01	; decrement bitcounter,next loop r0>0
+;	
+;	; check bit-9 AKN/NAKN
+;	orl p1,#$(1 << SCL) ; SCL high, clock rising
+;	in a,p1		; read P1x
+;	nop		; carry to be define
+;	anl p1,#~(1 << SCL) ; SCL low, clock falling
+;	
+;	ret
 
 
 ;*****************************************
@@ -195,7 +294,7 @@ I2CSTOP
 BCKLGHTON
 	call I2CSTART	;
 	; i2c address byte
-	mov a,#LCDADDR	; i2c 7-bit LCD address
+	mov a,#I2CLCDWR	; i2c 7-bit LCD address
 	clr F0		; set write mode
 	clr F1		; set data  mode
 	cpl F1		; set address mode
