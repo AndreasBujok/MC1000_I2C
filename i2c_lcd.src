@@ -50,9 +50,9 @@ x0	call I2CSTART	;
 	;*** Init Try 1
 	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
 	call I2COUT	;
-	mov a,#$(%00110100) ; Function Set #1, E=1, RS=0
+	mov a,#$(%00111100) ; Function Set #1, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00110000) ; E=0, RS=0
+	mov a,#$(%00111000) ; E=0, RS=0
 	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
@@ -60,9 +60,9 @@ x0	call I2CSTART	;
 	call WATCHDOG
 	
 	;*** Init Try 2
-	mov a,#$(%00110100) ; Function Set #2, E=1, RS=0
+	mov a,#$(%00111100) ; Function Set #2, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00110000) ; E=0, RS=0
+	mov a,#$(%00111000) ; E=0, RS=0
 	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
@@ -70,9 +70,9 @@ x0	call I2CSTART	;
 	call WATCHDOG
 	
 	;*** Init Try 3
-	mov a,#$(%00110100) ; Function Set #3, E=1, RS=0
+	mov a,#$(%00111100) ; Function Set #3, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00110000) ; E=0, RS=0
+	mov a,#$(%00111000) ; E=0, RS=0
 	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
@@ -80,9 +80,9 @@ x0	call I2CSTART	;
 	call WATCHDOG
 	
 	; Init set 4bit mode
-	mov a,#$(%00100100) ; Function Set, DL=0 4bit datalength, E=1, RS=0
+	mov a,#$(%00101100) ; Function Set, DL=0 4bit datalength, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00100000) ; E=0, RS=0
+	mov a,#$(%00101000) ; E=0, RS=0
 	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
@@ -92,14 +92,14 @@ x0	call I2CSTART	;
 	;***** Init sequence highnibble, low nibble
 	
 	; set 'Function Set' high nibble
-	mov a,#$(%00100100) ; Functiom set DL=0 4bit datalength, E=1, RS=0
+	mov a,#$(%00101100) ; Functiom set DL=0 4bit datalength, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00100000) ; E=0, RS=0
+	mov a,#$(%00101000) ; E=0, RS=0
 	call I2COUT	;
 	; set 'Function Set' low nibble
-	mov a,#$(%10000100) ; N=1 2lines, F=0 5x7 dot, E=1, RS=0
+	mov a,#$(%10001100) ; N=1 2lines, F=0 5x7 dot, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%10000000) ; E=0, RS=0
+	mov a,#$(%10001000) ; E=0, RS=0
 	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
@@ -107,14 +107,14 @@ x0	call I2CSTART	;
 	call WATCHDOG
 	
 	; set 'Display Control' high nibble
-	mov a,#$(%00000100) ; display control, E=1, RS=0
+	mov a,#$(%00001100) ; display control, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00000000) ; E=0, RS=0
+	mov a,#$(%00001000) ; E=0, RS=0
 	call I2COUT	;
 	; set 'Display Control' low nibble
-	mov a,#$(%11000100) ; D=1 display on, C=0 cursor off, B=0 blink cursor off, E=1, RS=0
+	mov a,#$(%11001100) ; D=1 display on, C=0 cursor off, B=0 blink cursor off, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%11000000) ; E=0, RS=0
+	mov a,#$(%11001000) ; E=0, RS=0
 	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
@@ -122,14 +122,14 @@ x0	call I2CSTART	;
 	call WATCHDOG
 	
 	; set 'Clear Control' high nibble
-	mov a,#$(%00000100) ; clear display, E=1, RS=0
+	mov a,#$(%00001100) ; clear display, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00000000) ; E=0, RS=0
+	mov a,#$(%00001000) ; E=0, RS=0
 	call I2COUT	;
 	; set 'Display Control' low nibble
-	mov a,#$(%00010100) ; clear display, E=1, RS=0
+	mov a,#$(%00011100) ; clear display, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00010000) ; E=0, RS=0
+	mov a,#$(%00011000) ; E=0, RS=0
 	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
@@ -137,45 +137,77 @@ x0	call I2CSTART	;
 	call WATCHDOG
 	
 	; set 'Entry mode' high nibble
-	mov a,#$(%00000100) ; entry mode, E=1, RS=0
+	mov a,#$(%00001100) ; entry mode, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%00000000) ; E=0, RS=0
+	mov a,#$(%00001000) ; E=0, RS=0
 	call I2COUT	;
 	; set 'Display Control' low nibble
-	mov a,#$(%01100100) ; I/D=0 decrement, S=0 with display shift no, E=1, RS=0
+	mov a,#$(%01101100) ; I/D=0 decrement, S=0 with display shift no, E=1, RS=0
 	call I2COUT	;
-	mov a,#$(%01100000) ; E=0, RS=0
+	mov a,#$(%01101000) ; E=0, RS=0
 	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
 	call wait	
 	call WATCHDOG
+	
+	; set 'Cursor At Home' high nibble
+	mov a,#$(%00001100) ; Cursor At Home, E=1, RS=0
+	call I2COUT	;
+	mov a,#$(%00001000) ; E=0, RS=0
+	call I2COUT	;
+	; set 'Display Control' low nibble
+	mov a,#$(%00101100) ; Cursor At Home, E=1, RS=0
+	call I2COUT	;
+	mov a,#$(%00101000) ; E=0, RS=0
+	call I2COUT	;
+	
+	mov r4,#$01	; 1*10ms
+	call wait	
+	call WATCHDOG
+	
+	
+;	mov r1,#$00	; set index to 0
+;	mov a,r1	; lade text index
+;	movp3 a,@a	; hole zeichen aus P3, index akku
+;	jz loop		; null byte endekennung?
+;	movx @r0,a	; zeichen senden
+;	inc r1		; text index++
+;	jmp p_1		; naechstes Zeichen
+	
+	
+	
+	
 	
 	; write '@' high nibble
-	mov a,#$(%01000101) ; high nibble '@', E=1, RS=1
+	mov a,#$(%01001101) ; high nibble '@', E=1, RS=1
 	call I2COUT	;
-	mov a,#$(%01000001) ; E=0, RS=1
+	mov a,#$(%01001001) ; E=0, RS=1
 	call I2COUT	;
 	; set 'Display Control' low nibble
-	mov a,#$(%00000101) ; low nibble '@', E=1, RS=1
+	mov a,#$(%00001101) ; low nibble '@', E=1, RS=1
 	call I2COUT	;
-	mov a,#$(%00000001) ; E=0, RS=1
+	mov a,#$(%00001001) ; E=0, RS=1
 	call I2COUT	;
 	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
+	;jmp x1
 	
+;	mov r4,#$01	; 1*10ms
+;	call wait	
+;	call WATCHDOG
+;	
 	
 	call I2CSTOP	;
 	
-	call WATCHDOG
+x2	call WATCHDOG
 	call WATCHDOG
 	
-	jmp $
+	jmp x2
 	
 	
 
+
+.org $0100
 
 ;*****************************************
 ; sekunde                                *
@@ -193,8 +225,6 @@ sek_3		stop tcnt	; (1 cyc) timer anhalten
 		djnz r4,wait	; (2 cyc) repeat zaehler decrementieren
 		ret		; (2 cyc) bye
 
-
-.org $0100
 
 ;*****************************************
 ; I2C read data
@@ -431,6 +461,11 @@ TIMERINT:
 INTERRUPT:
 	retr			;
 
+
+.org $0300
+	;      0123456789abcdef
+	.text "Hallo Andreas  "
+	.byte 00h
 
 
 .end
