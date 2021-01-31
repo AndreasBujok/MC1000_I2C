@@ -47,9 +47,11 @@ x0	call I2CSTART	;
 	call wait	
 	call WATCHDOG
 	
-	;*** Init Try 1
+	;*** LCD Address
 	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
 	call I2COUT	;
+	
+	;*** Init Try 1
 	mov a,#$(%00111100) ; Function Set #1, E=1, RS=0
 	call I2COUT	;
 	mov a,#$(%00111000) ; E=0, RS=0
@@ -152,15 +154,17 @@ x0	call I2CSTART	;
 	call WATCHDOG
 	
 	; set 'Cursor At Home' high nibble
-	mov a,#$(%00001100) ; Cursor At Home, E=1, RS=0
-	call I2COUT	;
-	mov a,#$(%00001000) ; E=0, RS=0
-	call I2COUT	;
-	; set 'Display Control' low nibble
-	mov a,#$(%00101100) ; Cursor At Home, E=1, RS=0
-	call I2COUT	;
-	mov a,#$(%00101000) ; E=0, RS=0
-	call I2COUT	;
+	mov a,#$(%00000010)
+	call LCDCMD	;
+;	mov a,#$(%00001100) ; Cursor At Home, E=1, RS=0
+;	call I2COUT	;
+;	mov a,#$(%00001000) ; E=0, RS=0
+;	call I2COUT	;
+;	; set 'Display Control' low nibble
+;	mov a,#$(%00101100) ; Cursor At Home, E=1, RS=0
+;	call I2COUT	;
+;	mov a,#$(%00101000) ; E=0, RS=0
+;	call I2COUT	;
 	
 	mov r4,#$01	; 1*10ms
 	call wait	
@@ -208,6 +212,43 @@ x2	call WATCHDOG
 
 
 .org $0100
+
+;*****************************************
+; Write LCD 4-bit command
+; A= LCD 8bit-command
+; r5= temp Port expander PCF8574
+; r6= temp LCD 8bit-command
+;*****************************************
+LCDCMD
+	mov r6,a	; store 8-bit LCD-CMD
+	anl a,#$F0	; cut low nibble LCD-CMD
+	add a,#EXPWRCMD ; add P0-P3 expander, K=1, E=1, RW=0, RS=0
+	mov r5,a	; store expander 8-bit
+	;mov a,#$(%00001100) ; Cursor At Home, E=1, RS=0
+	call I2COUT	;
+	mov a,r5	; load expander 8-bit
+	anl a,#$(%11111011) ; E=0
+	;mov a,#$(%00001000) ; E=0, RS=0
+	call I2COUT	;
+	
+	; set 'Display Control' low nibble
+	mov a,r6	; load 8-bit LCD-CMD
+	swap a		; xchange nibble, low -> high
+	anl a,#$F0	; cut low nibble LCD-CMD
+	add a,#EXPWRCMD	; add P0-P3 expander, K=1, E=1, RW=0, RS=0
+	;mov r6,#$((1<<K)|(1<<E)|(0<<RW)|(0<<RS)); store low nibble Expander
+	mov r5,a	; store expander 8-bit
+	call I2COUT	;
+	mov a,r5	; load expander 8-bit
+	anl a,#$(%11111011) ; E=0
+	;mov a,#$(%00001000) ; E=0, RS=0
+	call I2COUT	;
+	ret		;
+
+
+
+
+
 
 ;*****************************************
 ; sekunde                                *

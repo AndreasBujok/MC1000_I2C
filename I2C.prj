@@ -2,13 +2,13 @@
 Signature=UE Proj: v.1
 [Open Files]
 Open File0=D:\Daten\8048\Homebrew\MC1000\I2C\i2c_lcd.src
-Open File Pos0=1867
-Open File Line0=908
+Open File Pos0=4692
+Open File Line0=5360
 Active File Index=0
 Open File Window Pos0=2,3,-1,-1,-8,-30,200,200,1094,611
 Open File1=D:\Daten\8048\Homebrew\MC1000\I2C\i2c_lcd.lst
-Open File Pos1=2116
-Open File Line1=476
+Open File Pos1=4996
+Open File Line1=19240
 Open File Window Pos1=0,1,-1,-1,-8,-30,25,25,919,436
 Open File2=D:\Daten\8048\Homebrew\MC1000\I2C\lcd_i2c.inc
 Open File Pos2=2
@@ -22,5 +22,12 @@ Open File4=D:\Daten\8048\Homebrew\MC1000\I2C\mc1000.inc
 Open File Pos4=106
 Open File Line4=0
 Open File Window Pos4=0,1,-1,-1,-8,-30,175,175,1069,586
-Open File5=
+Open File5=D:\Daten\8048\Homebrew\MC1000\8251\rs232.src
 Active File Display Mode=3
+Open File Pos5=3870
+Open File Line5=3651
+Open File Window Pos5=0,1,-1,-1,-8,-30,125,125,1019,536
+Open File6=
+[Project Information]
+Project Start=E507010001000B00100037002300000063
+Working Time=5523
