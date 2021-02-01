@@ -2,16 +2,16 @@
 Signature=UE Proj: v.1
 [Open Files]
 Open File0=D:\Daten\8048\Homebrew\MC1000\I2C\i2c_lcd.src
-Open File Pos0=4692
-Open File Line0=5360
+Open File Pos0=4962
+Open File Line0=4118
 Active File Index=0
 Open File Window Pos0=2,3,-1,-1,-8,-30,200,200,1094,611
 Open File1=D:\Daten\8048\Homebrew\MC1000\I2C\i2c_lcd.lst
-Open File Pos1=4996
-Open File Line1=19240
+Open File Pos1=12825
+Open File Line1=11717
 Open File Window Pos1=0,1,-1,-1,-8,-30,25,25,919,436
 Open File2=D:\Daten\8048\Homebrew\MC1000\I2C\lcd_i2c.inc
-Open File Pos2=2
+Open File Pos2=46
 Open File Line2=0
 Open File Window Pos2=0,1,-1,-1,-8,-30,0,0,894,411
 Open File3=D:\Daten\8048\Homebrew\MC1000\I2C\IO.inc

@@ -37,108 +37,37 @@ INIT	dis i		; (1 cyc) interrupt verhindern
 	
 	call I2CINIT	; init i2c - SDA and SCL high
 	
-	call WATCHDOG
-	call WATCHDOG
+	call WATCHDOG	; trigger P27
 	
-x0	call I2CSTART	;
-	call WATCHDOG
-	
-	mov r4,#$0a	; 10*10ms
-	call wait	
-	call WATCHDOG
+x0	call I2CSTART	; start I2C sequence
 	
 	;*** LCD Address
 	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
-	call I2COUT	;
+	call I2COUT	; write to I2C
 	
-	;*** Init Try 1
-	mov a,#$(%00110000) ; Function Set #1, DL=1 8bit datalength
-	call LCDCMDI	; write direct high nibble LCD cmd 
+	call INITLCD	; init sequence LCD
 	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
+	mov r4,#$0a	; 10*10ms
+	call wait10	;
+	call WATCHDOG	; trigger P27
 	
-	;*** Init Try 2
-	mov a,#$(%00110000) ; Function Set #2, DL=1 8bit datalength
-	call LCDCMDI	; write direct high nibble LCD cmd 
+	; print text to LCD
+	mov r1,#$00	; set index to 0
+p_1	mov a,r1	; lade text index
+	movp3 a,@a	; hole zeichen aus P3, index akku
+	jz x1		; null byte endekennung?
+	call LCDDAT	; print chr on LCD
+	inc r1		; text index++
+	jmp p_1		; naechstes Zeichen
 	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
+x1	call I2CSTOP	; stop I2C sequence
 	
-	;*** Init Try 3
-	mov a,#$(%00110000) ; Function Set #3, DL=1 8bit datalength
-	call LCDCMDI	; write direct high nibble LCD cmd 
+x2	call WATCHDOG
 	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
-	
-	; Init set 4bit mode
-	mov a,#$(%00101100) ; Function Set, DL=0 4bit datalength, E=1, RS=0
-	call LCDCMDI	; write direct high nibble LCD cmd 
-	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
-	
-	;***** Init sequence highnibble, low nibble
-	
-	; set 'Function Set' high nibble
-	mov a,#$(%00101000) ; Function set: DL=0 4bit, N=1 2lines, F=0 5x7 do
-	call LCDCMD
-	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
-	
-	; set 'Display Control' high nibble
-	mov a,#$(%00001100) ; display control: D=1 display on, C=0 cursor off, B=0 blink cursor off
-	call LCDCMD
-	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
-	
-	; set 'Clear Control' high nibble
-	mov a,#$(%00000001) ; clear display
-	call LCDCMD
-	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
-	
-	; set 'Entry mode' high nibble
-	mov a,#$(%00000110) ; entry mode: I/D=1 increment, S=0 with display shift no
-	call LCDCMD
-	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
-	
-	; set 'Cursor At Home' high nibble
-	mov a,#$(%00000010)
-	call LCDCMD	;
-	
-	mov r4,#$01	; 1*10ms
-	call wait	
-	call WATCHDOG
+	jmp x2
 	
 	
-;	mov r1,#$00	; set index to 0
-;	mov a,r1	; lade text index
-;	movp3 a,@a	; hole zeichen aus P3, index akku
-;	jz loop		; null byte endekennung?
-;	movx @r0,a	; zeichen senden
-;	inc r1		; text index++
-;	jmp p_1		; naechstes Zeichen
-	
-	
-	
-	
-	
-	; write '@' high nibble
+	; write text to LCD
 	mov a,#'@'
 	call LCDDAT
 	mov a,#' '
@@ -178,75 +107,194 @@ x0	call I2CSTART	;
 ;	call WATCHDOG
 ;	
 	
-	call I2CSTOP	;
+;x1	call I2CSTOP	;
 	
-x2	call WATCHDOG
-	call WATCHDOG
-	
-	jmp x2
+;x2	call WATCHDOG
+;	call WATCHDOG
+;	
+;	jmp x2
 	
 	
 
 
 .org $0100
 
-;*****************************************
-; Write LCD 4-bit command
-; A= LCD 8bit-command
-; r5= temp Port expander PCF8574
-; r6= temp LCD 8bit-command
-;*****************************************
-LCDCMD
-	; set high nibble LCD command
-	mov r6,a	; store 8-bit LCD-CMD
-	anl a,#$F0	; cut low nibble LCD-CMD
-	add a,#EXPWRCMD ; add P0-P3 expander, K=1, E=1, RW=0, RS=0
-	mov r5,a	; store expander 8-bit
-	call I2COUT	;
-	mov a,r5	; load expander 8-bit
-	anl a,#$(%11111011) ; E=0
-	call I2COUT	;
-	
-	; set low nibble LCD command
-	mov a,r6	; load 8-bit LCD-CMD
-	swap a		; xchange nibble, low -> high
-LCDCMDI	anl a,#$F0	; cut low nibble LCD-CMD
-	add a,#EXPWRCMD	; add P0-P3 expander, K=1, E=1, RW=0, RS=0
-	mov r5,a	; store expander 8-bit
-	call I2COUT	;
-	mov a,r5	; load expander 8-bit
-	anl a,#$(%11111011) ; E=0
-	call I2COUT	;
-	ret		;
 
 ;*****************************************
-; Write LCD 4-bit data
-; A= LCD 8bit-data
+; Init sequence LCD 4-bit value
+; A= LCD 8bit-command
 ; r5= temp Port expander PCF8574
-; r6= temp LCD 8bit-command
 ;*****************************************
-LCDDAT
+INITLCD	;*** Init Try 1
+	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
+	mov a,#$(%00110000) ; Function Set #1, DL=1 8bit datalength
+	call LCDCMDI	; write high nibble LCD cmd 
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	;*** Init Try 2
+	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
+	mov a,#$(%00110000) ; Function Set #2, DL=1 8bit datalength
+	call LCDCMDI	; write high nibble LCD cmd 
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	;*** Init Try 3
+	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
+	mov a,#$(%00110000) ; Function Set #3, DL=1 8bit datalength
+	call LCDCMDI	; write high nibble LCD cmd 
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	; Init set 4bit mode
+	mov r5,#EXPWRCMD ; preset P0-P3 expander, K=1, E=1, RW=0, RS=0
+	mov a,#$(%00101100) ; Function Set, DL=0 4bit datalength, E=1, RS=0
+	call LCDCMDI	; write high nibble LCD cmd 
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	;***** valid Init sequence
+	; set 'Function Set'
+	mov a,#$(%00101000) ; Function set: DL=0 4bit, N=1 2lines, F=0 5x7 do
+	call LCDCMD	; write 8-bit LCD command
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	; set 'Display Control'
+	mov a,#$(%00001100) ; display control: D=1 display on, C=0 cursor off, B=0 blink cursor off
+	call LCDCMD	; write 8-bit LCD command
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	; set 'Clear Control'
+	mov a,#$(%00000001) ; clear display
+	call LCDCMD	; write 8-bit LCD command
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	; set 'Entry mode'
+	mov a,#$(%00000110) ; entry mode: I/D=1 increment, S=0 with display shift no
+	call LCDCMD	; write 8-bit LCD command
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	; set 'Cursor At Home'
+	mov a,#$(%00000010) ; 'Cursor At Home'
+	call LCDCMD	; write 8-bit LCD command
+	
+	call wait10	; 1*10ms
+	call WATCHDOG	; trigger P27
+	
+	ret		;bye
+
+
+
+
+;*****************************************
+; Write LCD 4-bit value
+; A= LCD 8bit-command
+; r5= temp Port expander PCF8574
+; r6= temp LCD 8bit-value
+;*****************************************
+LCDCMD	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
+	jmp LCD		;
+LCDDAT	mov r5,#EXPWRDAT ; P0-P3 expander, K=1, E=1, RW=0, RS=1
+	
 	; set high nibble LCD command
-	mov r6,a	; store 8-bit LCD-CMD
-	anl a,#$F0	; cut low nibble LCD-CMD
-	add a,#EXPWRDAT ; add P0-P3 expander, K=1, E=1, RW=0, RS=1
-	mov r5,a	; store expander 8-bit
-	call I2COUT	;
-	mov a,r5	; load expander 8-bit
-	anl a,#$(%11111011) ; E=0
-	call I2COUT	;
+LCD	mov r6,a	; store full 8-bit LCD-value
+	anl a,#$F0	; cut low nibble from LCD-value
+	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
+	mov r5,a	; store expander full 8-bit port
+	call I2COUT	; write to I2C
+	mov a,r5	; load expander full 8-bit
+	anl a,#$(%11111011) ; falling edge E=0
+	call I2COUT	; write to I2C
 	
 	; set low nibble LCD command
-	mov a,r6	; load 8-bit LCD-CMD
+	mov a,r6	; load full 8-bit LCD-value
 	swap a		; xchange nibble, low -> high
-	anl a,#$F0	; cut low nibble LCD-CMD
-	add a,#EXPWRDAT	; add P0-P3 expander, K=1, E=1, RW=0, RS=1
-	mov r5,a	; store expander 8-bit
-	call I2COUT	;
-	mov a,r5	; load expander 8-bit
-	anl a,#$(%11111011) ; E=0
-	call I2COUT	;
-	ret		;
+	mov r6,a	; store modified full 8bit LCD-value
+	mov a,r5	; load expander full 8-bit
+	anl a,#$0f	; extract K, E, RW, RS
+	mov r5,a	; store P0-P3 expander, (K, E, RW, RS)
+	mov a,r6	; load full 8-bit LCD-value
+LCDCMDI	anl a,#$F0	; cut low nibble LCD-value
+	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
+	mov r5,a	; store expander full 8-bit
+	call I2COUT	; write to I2C
+	mov a,r5	; load expander full 8-bit
+	anl a,#$(%11111011) ; falling edge E=0
+	call I2COUT	; write to I2C
+	ret		; bye
+
+
+;;*****************************************
+;; Write LCD 4-bit command
+;; A= LCD 8bit-command
+;; r5= temp Port expander PCF8574
+;; r6= temp LCD 8bit-command
+;;*****************************************
+;LCDCMD
+;	; set high nibble LCD command
+;	mov r6,a	; store 8-bit LCD-CMD
+;	anl a,#$F0	; cut low nibble LCD-CMD
+;	add a,#EXPWRCMD ; add P0-P3 expander, K=1, E=1, RW=0, RS=0
+;	mov r5,a	; store expander 8-bit
+;	call I2COUT	;
+;	mov a,r5	; load expander 8-bit
+;	anl a,#$(%11111011) ; E=0
+;	call I2COUT	;
+;	
+;	; set low nibble LCD command
+;	mov a,r6	; load 8-bit LCD-CMD
+;	swap a		; xchange nibble, low -> high
+;LCDCMDI	anl a,#$F0	; cut low nibble LCD-CMD
+;	add a,#EXPWRCMD	; add P0-P3 expander, K=1, E=1, RW=0, RS=0
+;	mov r5,a	; store expander 8-bit
+;	call I2COUT	;
+;	mov a,r5	; load expander 8-bit
+;	anl a,#$(%11111011) ; E=0
+;	call I2COUT	;
+;	ret		;
+;
+;
+;;*****************************************
+;; Write LCD 4-bit data
+;; A= LCD 8bit-data
+;; r5= temp Port expander PCF8574
+;; r6= temp LCD 8bit-command
+;;*****************************************
+;LCDDAT
+;	; set high nibble LCD command
+;	mov r6,a	; store 8-bit LCD-CMD
+;	anl a,#$F0	; cut low nibble LCD-CMD
+;	add a,#EXPWRDAT ; add P0-P3 expander, K=1, E=1, RW=0, RS=1
+;	mov r5,a	; store expander 8-bit
+;	call I2COUT	;
+;	mov a,r5	; load expander 8-bit
+;	anl a,#$(%11111011) ; E=0
+;	call I2COUT	;
+;	
+;	; set low nibble LCD command
+;	mov a,r6	; load 8-bit LCD-CMD
+;	swap a		; xchange nibble, low -> high
+;	anl a,#$F0	; cut low nibble LCD-CMD
+;	add a,#EXPWRDAT	; add P0-P3 expander, K=1, E=1, RW=0, RS=1
+;	mov r5,a	; store expander 8-bit
+;	call I2COUT	;
+;	mov a,r5	; load expander 8-bit
+;	anl a,#$(%11111011) ; E=0
+;	call I2COUT	;
+;	ret		;
+
 
 ;*****************************************
 ; sekunde                                *
@@ -254,9 +302,10 @@ LCDDAT
 ; ueberlauf als Wert gtenommen werden    *
 ; r4= n * 10ms
 ;*****************************************
-wait		mov a,#0b3h	; (1 cyc) 9,8 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
+wait10		mov r4,#$01	; 1*10ms
+wait		mov a,#0b3h	; (1 cyc) 9,895 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
 		mov t,a		; (1 cyc) timer mit akkuwert laden
-		call WATCHDOG	;
+t_start		call WATCHDOG	;
 		strt t		; (1 cyc) timer starten
 sek_2		jtf sek_3	; (2 cyc) timer abgelaufen
 		jmp sek_2	; (2 cyc) warten bis timer abgelaufen
@@ -412,21 +461,6 @@ I2CSTOP
 	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
 	nop
 	ret				;
-
-
-;*****************************************
-;
-;*****************************************
-BCKLGHTON
-	call I2CSTART	;
-	; i2c address byte
-	mov a,#I2CLCDWR	; i2c 7-bit LCD address
-	clr F0		; set write mode
-	clr F1		; set data  mode
-	cpl F1		; set address mode
-	call I2COUT
-	
-	
 
 
  ;************************************************
