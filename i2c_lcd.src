@@ -51,6 +51,32 @@ x0	call I2CSTART	; start I2C sequence
 	call wait10	;
 	call WATCHDOG	; trigger P27
 	
+	
+	mov a,#$08
+	call LCDCGR
+	mov a,#$(%10000001)
+	call LCDDAT
+	mov a,#$(%01000010)
+	call LCDDAT
+	mov a,#$(%00100100)
+	call LCDDAT
+	mov a,#$(%00011000)
+	call LCDDAT
+	mov a,#$(%00011000)
+	call LCDDAT
+	mov a,#$(%00000100)
+	call LCDDAT
+	mov a,#$(%00001010)
+	call LCDDAT
+	mov a,#$(%00010001)
+	call LCDDAT
+	
+	mov a,#$05
+	call LCDDDR
+	
+	call WATCHDOG	; trigger P27
+	
+	
 	; print text to LCD
 	mov r1,#$00	; set index to 0
 p_1	mov a,r1	; lade text index
@@ -65,56 +91,6 @@ x1	call I2CSTOP	; stop I2C sequence
 x2	call WATCHDOG
 	
 	jmp x2
-	
-	
-	; write text to LCD
-	mov a,#'@'
-	call LCDDAT
-	mov a,#' '
-	call LCDDAT
-	mov a,#'A'
-	call LCDDAT
-	mov a,#'n'
-	call LCDDAT
-	mov a,#'d'
-	call LCDDAT
-	mov a,#'r'
-	call LCDDAT
-	mov a,#'e'
-	call LCDDAT
-	mov a,#'a'
-	call LCDDAT
-	mov a,#'s'
-	call LCDDAT
-	
-	
-	
-	
-;	mov a,#$(%01001101) ; high nibble '@', E=1, RS=1
-;	call I2COUT	;
-;	mov a,#$(%01001001) ; E=0, RS=1
-;	call I2COUT	;
-;	; set 'Display Control' low nibble
-;	mov a,#$(%00001101) ; low nibble '@', E=1, RS=1
-;	call I2COUT	;
-;	mov a,#$(%00001001) ; E=0, RS=1
-;	call I2COUT	;
-	
-	;jmp x1
-	
-;	mov r4,#$01	; 1*10ms
-;	call wait	
-;	call WATCHDOG
-;	
-	
-;x1	call I2CSTOP	;
-	
-;x2	call WATCHDOG
-;	call WATCHDOG
-;	
-;	jmp x2
-	
-	
 
 
 .org $0100
@@ -159,7 +135,7 @@ INITLCD	;*** Init Try 1
 	
 	;***** valid Init sequence
 	; set 'Function Set'
-	mov a,#$(%00101000) ; Function set: DL=0 4bit, N=1 2lines, F=0 5x7 do
+	mov a,#$(%00101000) ; Function set: DL=0 4bit, N=1 2lines, F=0 5x7 dots
 	call LCDCMD	; write 8-bit LCD command
 	
 	call wait10	; 1*10ms
@@ -196,6 +172,44 @@ INITLCD	;*** Init Try 1
 	ret		;bye
 
 
+;*****************************************
+; Set CG/DD RAM address only, Write LCD 4-bit value
+; A= CG/DD LCD 8bit-RAM address
+; r5= temp Port expander PCF8574
+; r6= temp LCD 8bit-value
+;*****************************************
+LCDCGR	orl a,#$(%01000000)
+	jmp LCDR
+LCDDDR	orl a,#$(%10000000)
+	
+LCDR	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
+	
+	; set high nibble LCD command
+	mov r6,a	; store full 8-bit LCD-value
+	anl a,#$F0	; cut low nibble from LCD-value
+	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
+	mov r5,a	; store expander full 8-bit port
+	call I2COUT	; write to I2C
+	mov a,r5	; load expander full 8-bit
+	anl a,#$(%11111011) ; falling edge E=0
+	call I2COUT	; write to I2C
+	
+	; set low nibble LCD command
+	mov a,r6	; load full 8-bit LCD-value
+	swap a		; xchange nibble, low -> high
+	mov r6,a	; store modified full 8bit LCD-value
+	mov a,r5	; load expander full 8-bit
+	anl a,#$0f	; extract K, E, RW, RS
+	mov r5,a	; store P0-P3 expander, (K, E, RW, RS)
+	mov a,r6	; load full 8-bit LCD-value
+	anl a,#$F0	; cut low nibble LCD-value
+	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
+	mov r5,a	; store expander full 8-bit
+	call I2COUT	; write to I2C
+	mov a,r5	; load expander full 8-bit
+	anl a,#$(%11111011) ; falling edge E=0
+	call I2COUT	; write to I2C
+	ret		; bye
 
 
 ;*****************************************
@@ -463,6 +477,8 @@ I2CSTOP
 	ret				;
 
 
+.org $0200
+
  ;************************************************
 ; Load SW1/SW2
 ; R3/R4= temporary result of SW1/SW2
@@ -537,7 +553,9 @@ INTERRUPT:
 
 .org $0300
 	;      0123456789abcdef
-	.text "Hallo Andreas  "
+	.text "Hallo Andreas "
+	.byte 01h
+	.byte 02h
 	.byte 00h
 
 

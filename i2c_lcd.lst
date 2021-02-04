@@ -60,10 +60,10 @@
 0020   0000             
 0021   0000 04 20       _RESET		jmp INIT	; reset sprungadresse
 0022   0002 00          		nop
-0023   0003 24 FF       _INT		jmp INTERRUPT	; interrupt sprungadresse
+0023   0003 44 32       _INT		jmp INTERRUPT	; interrupt sprungadresse
 0024   0005 00          		nop
 0025   0006 00          		nop
-0026   0007 24 F6       _TINT		jmp TIMERINT	; timer interrupt sprungadresse
+0026   0007 44 29       _TINT		jmp TIMERINT	; timer interrupt sprungadresse
 0027   0009 00          		nop
 0028   000A             
 0029   0010             .org 0010h
@@ -78,517 +78,535 @@
 0035   0021 35          	dis tcnti	; (1 cyc) timer interrupt verhindern
 0036   0022 75          	ent0 clk	; (1 cyc) T0 prozessortakt ausgeben
 0037   0023             	
-0038   0023 34 BB       	call I2CINIT	; init i2c - SDA and SCL high
+0038   0023 34 E3       	call I2CINIT	; init i2c - SDA and SCL high
 0039   0025             	
-0040   0025 34 F1       	call WATCHDOG	; trigger P27
+0040   0025 54 24       	call WATCHDOG	; trigger P27
 0041   0027             	
-0042   0027 34 BE       x0	call I2CSTART	; start I2C sequence
+0042   0027 34 E6       x0	call I2CSTART	; start I2C sequence
 0043   0029             	
 0044   0029             	;*** LCD Address
 0045   0029 23 4E       	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
-0046   002B 34 A0       	call I2COUT	; write to I2C
+0046   002B 34 C8       	call I2COUT	; write to I2C
 0047   002D             	
 0048   002D 34 00       	call INITLCD	; init sequence LCD
 0049   002F             	
 0050   002F BC 0A       	mov r4,#$0a	; 10*10ms
-0051   0031 34 77       	call wait10	;
-0052   0033 34 F1       	call WATCHDOG	; trigger P27
+0051   0031 34 9F       	call wait10	;
+0052   0033 54 24       	call WATCHDOG	; trigger P27
 0053   0035             	
-0054   0035             	; print text to LCD
-0055   0035 B9 00       	mov r1,#$00	; set index to 0
-0056   0037 F9          p_1	mov a,r1	; lade text index
-0057   0038 E3          	movp3 a,@a	; hole zeichen aus P3, index akku
-0058   0039 C6 40       	jz x1		; null byte endekennung?
-0059   003B 34 55       	call LCDDAT	; print chr on LCD
-0060   003D 19          	inc r1		; text index++
-0061   003E 04 37       	jmp p_1		; naechstes Zeichen
-0062   0040             	
-0063   0040 34 C5       x1	call I2CSTOP	; stop I2C sequence
-0064   0042             	
-0065   0042 34 F1       x2	call WATCHDOG
-0066   0044             	
-0067   0044 04 42       	jmp x2
-0068   0046             	
-0069   0046             	
-0070   0046             	; write text to LCD
-0071   0046 23 40       	mov a,#'@'
-0072   0048 34 55       	call LCDDAT
-0073   004A 23 20       	mov a,#' '
-0074   004C 34 55       	call LCDDAT
-0075   004E 23 41       	mov a,#'A'
-0076   0050 34 55       	call LCDDAT
-0077   0052 23 6E       	mov a,#'n'
-0078   0054 34 55       	call LCDDAT
-0079   0056 23 64       	mov a,#'d'
-0080   0058 34 55       	call LCDDAT
-0081   005A 23 72       	mov a,#'r'
-0082   005C 34 55       	call LCDDAT
-0083   005E 23 65       	mov a,#'e'
-0084   0060 34 55       	call LCDDAT
-0085   0062 23 61       	mov a,#'a'
-0086   0064 34 55       	call LCDDAT
-0087   0066 23 73       	mov a,#'s'
-0088   0068 34 55       	call LCDDAT
-0089   006A             	
-0090   006A             	
-0091   006A             	
-0092   006A             	
-0093   006A             ;	mov a,#$(%01001101) ; high nibble '@', E=1, RS=1
-0094   006A             ;	call I2COUT	;
-0095   006A             ;	mov a,#$(%01001001) ; E=0, RS=1
-0096   006A             ;	call I2COUT	;
-0097   006A             ;	; set 'Display Control' low nibble
-0098   006A             ;	mov a,#$(%00001101) ; low nibble '@', E=1, RS=1
-0099   006A             ;	call I2COUT	;
-0100   006A             ;	mov a,#$(%00001001) ; E=0, RS=1
-0101   006A             ;	call I2COUT	;
-0102   006A             	
-0103   006A             	;jmp x1
-0104   006A             	
-0105   006A             ;	mov r4,#$01	; 1*10ms
-0106   006A             ;	call wait	
-0107   006A             ;	call WATCHDOG
-0108   006A             ;	
-0109   006A             	
-0110   006A             ;x1	call I2CSTOP	;
-0111   006A             	
-0112   006A             ;x2	call WATCHDOG
-0113   006A             ;	call WATCHDOG
-0114   006A             ;	
-0115   006A             ;	jmp x2
-0116   006A             	
-0117   006A             	
-0118   006A             
-0119   006A             
-0120   0100             .org $0100
-0121   0100             
-0122   0100             
-0123   0100             ;*****************************************
-0124   0100             ; Init sequence LCD 4-bit value
-0125   0100             ; A= LCD 8bit-command
-0126   0100             ; r5= temp Port expander PCF8574
-0127   0100             ;*****************************************
-0128   0100             INITLCD	;*** Init Try 1
-0129   0100 BD 0C       	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
-0130   0102 23 30       	mov a,#$(%00110000) ; Function Set #1, DL=1 8bit datalength
-0131   0104 34 6B       	call LCDCMDI	; write high nibble LCD cmd 
-0132   0106             	
-0133   0106 34 77       	call wait10	; 1*10ms
-0134   0108 34 F1       	call WATCHDOG	; trigger P27
-0135   010A             	
-0136   010A             	;*** Init Try 2
-0137   010A BD 0C       	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
-0138   010C 23 30       	mov a,#$(%00110000) ; Function Set #2, DL=1 8bit datalength
-0139   010E 34 6B       	call LCDCMDI	; write high nibble LCD cmd 
-0140   0110             	
-0141   0110 34 77       	call wait10	; 1*10ms
-0142   0112 34 F1       	call WATCHDOG	; trigger P27
-0143   0114             	
-0144   0114             	;*** Init Try 3
-0145   0114 BD 0C       	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
-0146   0116 23 30       	mov a,#$(%00110000) ; Function Set #3, DL=1 8bit datalength
-0147   0118 34 6B       	call LCDCMDI	; write high nibble LCD cmd 
-0148   011A             	
-0149   011A 34 77       	call wait10	; 1*10ms
-0150   011C 34 F1       	call WATCHDOG	; trigger P27
-0151   011E             	
-0152   011E             	; Init set 4bit mode
-0153   011E BD 0C       	mov r5,#EXPWRCMD ; preset P0-P3 expander, K=1, E=1, RW=0, RS=0
-0154   0120 23 2C       	mov a,#$(%00101100) ; Function Set, DL=0 4bit datalength, E=1, RS=0
-0155   0122 34 6B       	call LCDCMDI	; write high nibble LCD cmd 
-0156   0124             	
-0157   0124 34 77       	call wait10	; 1*10ms
-0158   0126 34 F1       	call WATCHDOG	; trigger P27
-0159   0128             	
-0160   0128             	;***** valid Init sequence
-0161   0128             	; set 'Function Set'
-0162   0128 23 28       	mov a,#$(%00101000) ; Function set: DL=0 4bit, N=1 2lines, F=0 5x7 do
-0163   012A 34 51       	call LCDCMD	; write 8-bit LCD command
-0164   012C             	
-0165   012C 34 77       	call wait10	; 1*10ms
-0166   012E 34 F1       	call WATCHDOG	; trigger P27
-0167   0130             	
-0168   0130             	; set 'Display Control'
-0169   0130 23 0C       	mov a,#$(%00001100) ; display control: D=1 display on, C=0 cursor off, B=0 blink cursor off
-0170   0132 34 51       	call LCDCMD	; write 8-bit LCD command
-0171   0134             	
-0172   0134 34 77       	call wait10	; 1*10ms
-0173   0136 34 F1       	call WATCHDOG	; trigger P27
-0174   0138             	
-0175   0138             	; set 'Clear Control'
-0176   0138 23 01       	mov a,#$(%00000001) ; clear display
-0177   013A 34 51       	call LCDCMD	; write 8-bit LCD command
-0178   013C             	
-0179   013C 34 77       	call wait10	; 1*10ms
-0180   013E 34 F1       	call WATCHDOG	; trigger P27
-0181   0140             	
-0182   0140             	; set 'Entry mode'
-0183   0140 23 06       	mov a,#$(%00000110) ; entry mode: I/D=1 increment, S=0 with display shift no
-0184   0142 34 51       	call LCDCMD	; write 8-bit LCD command
-0185   0144             	
-0186   0144 34 77       	call wait10	; 1*10ms
-0187   0146 34 F1       	call WATCHDOG	; trigger P27
-0188   0148             	
-0189   0148             	; set 'Cursor At Home'
-0190   0148 23 02       	mov a,#$(%00000010) ; 'Cursor At Home'
-0191   014A 34 51       	call LCDCMD	; write 8-bit LCD command
-0192   014C             	
-0193   014C 34 77       	call wait10	; 1*10ms
-0194   014E 34 F1       	call WATCHDOG	; trigger P27
-0195   0150             	
-0196   0150 83          	ret		;bye
-0197   0151             
-0198   0151             
-0199   0151             
-0200   0151             
-0201   0151             ;*****************************************
-0202   0151             ; Write LCD 4-bit value
-0203   0151             ; A= LCD 8bit-command
-0204   0151             ; r5= temp Port expander PCF8574
-0205   0151             ; r6= temp LCD 8bit-value
-0206   0151             ;*****************************************
-0207   0151 BD 0C       LCDCMD	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
-0208   0153 24 57       	jmp LCD		;
-0209   0155 BD 0D       LCDDAT	mov r5,#EXPWRDAT ; P0-P3 expander, K=1, E=1, RW=0, RS=1
-0210   0157             	
-0211   0157             	; set high nibble LCD command
-0212   0157 AE          LCD	mov r6,a	; store full 8-bit LCD-value
-0213   0158 53 F0       	anl a,#$F0	; cut low nibble from LCD-value
-0214   015A 6D          	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
-0215   015B AD          	mov r5,a	; store expander full 8-bit port
-0216   015C 34 A0       	call I2COUT	; write to I2C
-0217   015E FD          	mov a,r5	; load expander full 8-bit
-0218   015F 53 FB       	anl a,#$(%11111011) ; falling edge E=0
-0219   0161 34 A0       	call I2COUT	; write to I2C
-0220   0163             	
-0221   0163             	; set low nibble LCD command
-0222   0163 FE          	mov a,r6	; load full 8-bit LCD-value
-0223   0164 47          	swap a		; xchange nibble, low -> high
-0224   0165 AE          	mov r6,a	; store modified full 8bit LCD-value
-0225   0166 FD          	mov a,r5	; load expander full 8-bit
-0226   0167 53 0F       	anl a,#$0f	; extract K, E, RW, RS
-0227   0169 AD          	mov r5,a	; store P0-P3 expander, (K, E, RW, RS)
-0228   016A FE          	mov a,r6	; load full 8-bit LCD-value
-0229   016B 53 F0       LCDCMDI	anl a,#$F0	; cut low nibble LCD-value
-0230   016D 6D          	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
-0231   016E AD          	mov r5,a	; store expander full 8-bit
-0232   016F 34 A0       	call I2COUT	; write to I2C
-0233   0171 FD          	mov a,r5	; load expander full 8-bit
-0234   0172 53 FB       	anl a,#$(%11111011) ; falling edge E=0
-0235   0174 34 A0       	call I2COUT	; write to I2C
-0236   0176 83          	ret		; bye
-0237   0177             
-0238   0177             
-0239   0177             ;;*****************************************
-0240   0177             ;; Write LCD 4-bit command
-0241   0177             ;; A= LCD 8bit-command
-0242   0177             ;; r5= temp Port expander PCF8574
-0243   0177             ;; r6= temp LCD 8bit-command
-0244   0177             ;;*****************************************
-0245   0177             ;LCDCMD
-0246   0177             ;	; set high nibble LCD command
-0247   0177             ;	mov r6,a	; store 8-bit LCD-CMD
-0248   0177             ;	anl a,#$F0	; cut low nibble LCD-CMD
-0249   0177             ;	add a,#EXPWRCMD ; add P0-P3 expander, K=1, E=1, RW=0, RS=0
-0250   0177             ;	mov r5,a	; store expander 8-bit
-0251   0177             ;	call I2COUT	;
-0252   0177             ;	mov a,r5	; load expander 8-bit
-0253   0177             ;	anl a,#$(%11111011) ; E=0
-0254   0177             ;	call I2COUT	;
-0255   0177             ;	
-0256   0177             ;	; set low nibble LCD command
-0257   0177             ;	mov a,r6	; load 8-bit LCD-CMD
-0258   0177             ;	swap a		; xchange nibble, low -> high
-0259   0177             ;LCDCMDI	anl a,#$F0	; cut low nibble LCD-CMD
-0260   0177             ;	add a,#EXPWRCMD	; add P0-P3 expander, K=1, E=1, RW=0, RS=0
-0261   0177             ;	mov r5,a	; store expander 8-bit
-0262   0177             ;	call I2COUT	;
-0263   0177             ;	mov a,r5	; load expander 8-bit
-0264   0177             ;	anl a,#$(%11111011) ; E=0
-0265   0177             ;	call I2COUT	;
-0266   0177             ;	ret		;
-0267   0177             ;
-0268   0177             ;
-0269   0177             ;;*****************************************
-0270   0177             ;; Write LCD 4-bit data
-0271   0177             ;; A= LCD 8bit-data
-0272   0177             ;; r5= temp Port expander PCF8574
-0273   0177             ;; r6= temp LCD 8bit-command
-0274   0177             ;;*****************************************
-0275   0177             ;LCDDAT
-0276   0177             ;	; set high nibble LCD command
-0277   0177             ;	mov r6,a	; store 8-bit LCD-CMD
-0278   0177             ;	anl a,#$F0	; cut low nibble LCD-CMD
-0279   0177             ;	add a,#EXPWRDAT ; add P0-P3 expander, K=1, E=1, RW=0, RS=1
-0280   0177             ;	mov r5,a	; store expander 8-bit
-0281   0177             ;	call I2COUT	;
-0282   0177             ;	mov a,r5	; load expander 8-bit
-0283   0177             ;	anl a,#$(%11111011) ; E=0
-0284   0177             ;	call I2COUT	;
-0285   0177             ;	
-0286   0177             ;	; set low nibble LCD command
-0287   0177             ;	mov a,r6	; load 8-bit LCD-CMD
-0288   0177             ;	swap a		; xchange nibble, low -> high
-0289   0177             ;	anl a,#$F0	; cut low nibble LCD-CMD
-0290   0177             ;	add a,#EXPWRDAT	; add P0-P3 expander, K=1, E=1, RW=0, RS=1
-0291   0177             ;	mov r5,a	; store expander 8-bit
-0292   0177             ;	call I2COUT	;
-0293   0177             ;	mov a,r5	; load expander 8-bit
-0294   0177             ;	anl a,#$(%11111011) ; E=0
-0295   0177             ;	call I2COUT	;
-0296   0177             ;	ret		;
-0297   0177             
-0298   0177             
-0299   0177             ;*****************************************
-0300   0177             ; sekunde                                *
-0301   0177             ; Da aufwaertszahler, muss die diff zum  *
-0302   0177             ; ueberlauf als Wert gtenommen werden    *
-0303   0177             ; r4= n * 10ms
-0304   0177             ;*****************************************
-0305   0177 BC 01       wait10		mov r4,#$01	; 1*10ms
-0306   0179 23 B3       wait		mov a,#0b3h	; (1 cyc) 9,895 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
-0307   017B 62          		mov t,a		; (1 cyc) timer mit akkuwert laden
-0308   017C 34 F1       t_start		call WATCHDOG	;
-0309   017E 55          		strt t		; (1 cyc) timer starten
-0310   017F 16 83       sek_2		jtf sek_3	; (2 cyc) timer abgelaufen
-0311   0181 24 7F       		jmp sek_2	; (2 cyc) warten bis timer abgelaufen
-0312   0183 65          sek_3		stop tcnt	; (1 cyc) timer anhalten
-0313   0184 EC 79       		djnz r4,wait	; (2 cyc) repeat zaehler decrementieren
-0314   0186 83          		ret		; (2 cyc) bye
-0315   0187             
-0316   0187             
-0317   0187             ;*****************************************
-0318   0187             ; I2C read data
-0319   0187             ; SDA & SCL should be low before
-0320   0187             ; r0= temp bitcounter
-0321   0187             ; r3= temp data
-0322   0187             ; A=  data
-0323   0187             ;*****************************************
-0324   0187             I2CIN
-0325   0187             	; SDA & SCL should here be low
-0326   0187 B8 08       	mov r0,#$08	; set bitcounter to 8-bit
-0327   0189             	
-0328   0189             	; loop over 8-bit data
-0329   0189             I2CO01	
-0330   0189 89 01       	orl p1,#$(1 << SCL) ; SCL high, clock rising
-0331   018B 09          	in a,p1		; read P1x (SDA)
-0332   018C 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
-0333   018E             	
-0334   018E 97          	clr c		; C=0
-0335   018F 32 93       	jb1 I2CO02	; SDA=1 (P1x)
-0336   0191 24 94       	jmp I2CO03	; SDA=0 (P1x)
-0337   0193 A7          I2CO02	cpl c		; C=1
-0338   0194             	
-0339   0194 FB          I2CO03	mov a,r3	; lopad temp data
-0340   0195 F7          	rlc a		; shift carry into A
-0341   0196 AB          	mov r3,a	; save temp data
-0342   0197             	
-0343   0197 E8 89       	djnz r0,I2CO01	; decrement bitcounter,next loop r0>0
-0344   0199             	
-0345   0199             	; check bit-9 AKN/NAKN
-0346   0199 89 01       	orl p1,#$(1 << SCL) ; SCL high, clock rising
-0347   019B 09          	in a,p1		; read P1x
-0348   019C 00          	nop		; carry to be define
-0349   019D 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
-0350   019F             	
-0351   019F 83          	ret
-0352   01A0             
-0353   01A0             
-0354   01A0             ;*****************************************
-0355   01A0             ; I2C write out address/date
-0356   01A0             ; SDA & SCL should be low before
-0357   01A0             ; data must be stable before and after clock
-0358   01A0             ; A= address/data -> R3
-0359   01A0             ; r0= temp bitcounter
-0360   01A0             ; r3= temp address/data
-0361   01A0             ;*****************************************
-0362   01A0             I2COUT	; SDA & SCL should here be low
-0363   01A0             	
-0364   01A0 B8 08       	mov r0,#$08	; set bitcounter to 8-bit
-0365   01A2             	
-0366   01A2             	; loop over 8-bit adress+RW/data
-0367   01A2 AB          I2CB01	mov r3,a	; set A to temp adress/data
-0368   01A3 97          	clr c		; prerpare carry
-0369   01A4 FB          	mov a,r3	; load temp adress/data
-0370   01A5 F7          	rlc a		; shift bit out into carry
-0371   01A6 F6 AA       	jc I2CB1	; bit set
-0372   01A8 24 AC       	jmp I2CB2	; bit clear
-0373   01AA 89 02       I2CB1	orl p1,#$(1 << SDA) ; SDA high, bit rising
-0374   01AC 89 01       I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
-0375   01AE 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
-0376   01B0 99 FD       	anl p1,#~(1 << SDA) ; SDA low, bit falling
-0377   01B2 E8 A2       	djnz r0,I2CB01	; decrement bitcounter,next loop r0>0
-0378   01B4             	
-0379   01B4             	; check bit-9 AKN/NAKN
-0380   01B4 89 01       	orl p1,#$(1 << SCL) ; SCL high, clock rising
-0381   01B6 09          	in a,p1		; read P1x
-0382   01B7 00          	nop		; carry to be define
-0383   01B8 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
-0384   01BA             	
-0385   01BA 83          	ret
-0386   01BB             
-0387   01BB             
-0388   01BB             ;;*****************************************
-0389   01BB             ;; I2C write out address/date
-0390   01BB             ;; SDA & SCL should be low before
-0391   01BB             ;; data must be stable before and after clock
-0392   01BB             ;; A= address/data -> R3
-0393   01BB             ;; r0= temp bitcounter
-0394   01BB             ;; r3= temp address/data
-0395   01BB             ;; F0= R/W 1/0
-0396   01BB             ;; F1= address/data 1/0
-0397   01BB             ;;*****************************************
-0398   01BB             ;I2COUT
-0399   01BB             ;	mov r0,#$08	; set bitcounter to 8-bit
-0400   01BB             ;	jf1 I2CB00	; F1=1 7-bit address mode + 1-bit RW
-0401   01BB             ;	jmp I2CB01	; F1=0 8-bit data mode
-0402   01BB             ;	
-0403   01BB             ;	; adapt to address + R/W
-0404   01BB             ;I2CB00	rl a		; convert A to address << 1 and b0=0 (write)
-0405   01BB             ;	jf0 I2CB00A	; read mode
-0406   01BB             ;	jmp I2CB01	; write mode
-0407   01BB             ;I2CB00A	orl a,#$01	; b0=1 (read)
-0408   01BB             ;	
-0409   01BB             ;	; SDA & SCL should here be low
-0410   01BB             ;	; loop over 8-bit adress+RW/data
-0411   01BB             ;I2CB01	mov r3,a	; set A to temp adress/data
-0412   01BB             ;	clr c		; prerpare carry
-0413   01BB             ;	mov a,r3	; load temp adress/data
-0414   01BB             ;	rlc a		; shift bit out into carry
-0415   01BB             ;	jc I2CB1	; bit set
-0416   01BB             ;	jmp I2CB2	; bit clear
-0417   01BB             ;I2CB1	orl p1,#$(1 << SDA) ; SDA high, bit rising
-0418   01BB             ;I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
-0419   01BB             ;	anl p1,#~(1 << SCL) ; SCL low, clock falling
-0420   01BB             ;	anl p1,#~(1 << SDA) ; SDA low, bit falling
-0421   01BB             ;	djnz r0,I2CB01	; decrement bitcounter,next loop r0>0
-0422   01BB             ;	
-0423   01BB             ;	; check bit-9 AKN/NAKN
-0424   01BB             ;	orl p1,#$(1 << SCL) ; SCL high, clock rising
-0425   01BB             ;	in a,p1		; read P1x
-0426   01BB             ;	nop		; carry to be define
-0427   01BB             ;	anl p1,#~(1 << SCL) ; SCL low, clock falling
-0428   01BB             ;	
-0429   01BB             ;	ret
-0430   01BB             
-0431   01BB             
-0432   01BB             ;*****************************************
-0433   01BB             ; I2C init sequence
-0434   01BB             ;*****************************************
-0435   01BB             I2CINIT	
-0436   01BB 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
-0437   01BD 83          	ret
-0438   01BE             
-0439   01BE             
-0440   01BE             ;*****************************************
-0441   01BE             ; I2C start sequence
-0442   01BE             ; SDA & SCL should be low before
-0443   01BE             ;*****************************************
-0444   01BE             I2CSTART
-0445   01BE 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
-0446   01C0 99 FD       	anl p1,#~(1 << SDA)		; SDA low, SCL high
-0447   01C2 99 FC       	anl p1,#~((1 << SDA)|(1 << SCL)) ; SDA & SCL low
-0448   01C4 83          	ret				;
-0449   01C5             
-0450   01C5             
-0451   01C5             ;*****************************************
-0452   01C5             ; I2C start sequence
-0453   01C5             ; SDA & SCL should be low before
-0454   01C5             ;*****************************************
-0455   01C5             I2CSTOP
-0456   01C5             	;in a,p1
-0457   01C5             	;outl p1,a
-0458   01C5 89 01       	orl p1,#$(1 << SCL)		; SCL high
-0459   01C7 00          	nop
-0460   01C8 00          	nop
-0461   01C9 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
-0462   01CB 00          	nop
-0463   01CC 83          	ret				;
-0464   01CD             
-0465   01CD             
-0466   01CD              ;************************************************
-0467   01CD             ; Load SW1/SW2
-0468   01CD             ; R3/R4= temporary result of SW1/SW2
-0469   01CD             ; $20= result of SW1
-0470   01CD             ; $21= result of SW2
-0471   01CD             ;************************************************
-0472   01CD             rdSW12:
-0473   01CD 23 10       	mov	a,#$10		; init value-corunter
-0474   01CF AA          	mov	r2,a		; with %00010000
-0475   01D0             L0332:
-0476   01D0 FB          	mov	a,r3		; move SW counter from r3
-0477   01D1 AC          	mov	r4,a		; to SW counter r4
-0478   01D2             L0334:
-0479   01D2 CA          	dec	r2		; value-counter r2--
-0480   01D3 09          	in	a,p1		; load current value of port1
-0481   01D4 53 F0       	anl	a,#$F0		; cut low nibble
-0482   01D6 4A          	orl	a,r2		; "add" value-counter r2 into
-0483   01D7 39          	outl	p1,a		; write back to port1
-0484   01D8 FB          	mov	a,r3		; load A with r3
-0485   01D9 97          	clr	c		; clear carry
-0486   01DA 56 DD       	jt1	L033F		; SW is "On"?
-0487   01DC A7          	cpl	c		; set carry (inverted val)
-0488   01DD             L033F:
-0489   01DD F7          	rlc	a		; fill value with carry from right
-0490   01DE AB          	mov	r3,a		; store result to counter r3
-0491   01DF FA          	mov	a,r2		; load counter r2
-0492   01E0 72 D0       	jb3	L0332		; bit 3 set (SW2 active)?
-0493   01E2 53 0F       	anl	a,#$0F		; cut high nibble
-0494   01E4 C6 E8       	jz	L034A		; value-counter clear
-0495   01E6 24 D2       	jmp	L0334		; next loop, SW counter -> r4
-0496   01E8             L034A:
-0497   01E8 B8 20       	mov	r0,#ZP_SW1	; set index ZP $20
-0498   01EA FB          	mov	a,r3		; store result from r3
-0499   01EB A0          	mov	@r0,a		; to RAM $20
-0500   01EC B8 21       	mov	r0,#ZP_SW2	; set index ZP $21
-0501   01EE FC          	mov	a,r4		; store result from r4
-0502   01EF A0          	mov	@r0,a		; to RAM $21
-0503   01F0 83          	ret			; bye
-0504   01F1             
-0505   01F1             
-0506   01F1             ;*****************************************
-0507   01F1             ; watchdog impuls |_|- high->low -> high *
-0508   01F1             ; must be execute at least each ~630ms   *
-0509   01F1             ;*****************************************
-0510   01F1             WATCHDOG:
-0511   01F1 9A 7F       	anl p2,#$(~b_WD)	; (2 cyc) P27 Watchdog low
-0512   01F3 8A 80       	orl p2,#b_WD		; (2 cyc) P27 Watchdog high
-0513   01F5 83          	ret			; (2 cyc)
-0514   01F6             
-0515   01F6             
-0516   01F6             
-0517   01F6             ;***********************************************
-0518   01F6             ; Timer interrupt routine alle 10,02 ms        *
-0519   01F6             ;***********************************************
-0520   01F6             TIMERINT:
-0521   01F6 93          	retr
-0522   01F7             	
-0523   01F7             	
-0524   01F7 23 B3       	mov a,#0b3h		; (1 cyc) 9,8 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
-0525   01F9 62          	mov t,a			; (1 cyc) timer mit akkuwert laden
-0526   01FA 09          	in a,p1			; (2 cyc) lese port #1 in kku
-0527   01FB D3 80       	xrl a,#b_WD		; (2 cyc) XOR akku mit bit 7
-0528   01FD 39          	outl p1,a		; (2 cyc) schreibe akku nach port #1
-0529   01FE 93          	retr			; (2 cyc) return mit PSW restore
-0530   01FF             
-0531   01FF             ;***********************************************
-0532   01FF             ; interrupt routine                            *
-0533   01FF             ;***********************************************
-0534   01FF             INTERRUPT:
-0535   01FF 93          	retr			;
-0536   0200             
-0537   0200             
-0538   0300             .org $0300
-0539   0300             	;      0123456789abcdef
-0540   0300 48 61 6C 6C 	.text "Hallo Andreas  "
-0540   0304 6F 20 41 6E 
-0540   0308 64 72 65 61 
-0540   030C 73 20 20 
-0541   030F 00          	.byte 00h
-0542   0310             
-0543   0310             
-0544   0310             .end
-0545   0310             
+0054   0035             	
+0055   0035 23 08       	mov a,#$08
+0056   0037 34 51       	call LCDCGR
+0057   0039 23 81       	mov a,#$(%10000001)
+0058   003B 34 7D       	call LCDDAT
+0059   003D 23 42       	mov a,#$(%01000010)
+0060   003F 34 7D       	call LCDDAT
+0061   0041 23 24       	mov a,#$(%00100100)
+0062   0043 34 7D       	call LCDDAT
+0063   0045 23 18       	mov a,#$(%00011000)
+0064   0047 34 7D       	call LCDDAT
+0065   0049 23 18       	mov a,#$(%00011000)
+0066   004B 34 7D       	call LCDDAT
+0067   004D 23 04       	mov a,#$(%00000100)
+0068   004F 34 7D       	call LCDDAT
+0069   0051 23 0A       	mov a,#$(%00001010)
+0070   0053 34 7D       	call LCDDAT
+0071   0055 23 11       	mov a,#$(%00010001)
+0072   0057 34 7D       	call LCDDAT
+0073   0059             	
+0074   0059 23 45       	mov a,#$45
+0075   005B 34 55       	call LCDDDR
+0076   005D             	
+0077   005D 54 24       	call WATCHDOG	; trigger P27
+0078   005F             	
+0079   005F             	
+0080   005F             	; print text to LCD
+0081   005F B9 00       	mov r1,#$00	; set index to 0
+0082   0061 F9          p_1	mov a,r1	; lade text index
+0083   0062 E3          	movp3 a,@a	; hole zeichen aus P3, index akku
+0084   0063 C6 6A       	jz x1		; null byte endekennung?
+0085   0065 34 7D       	call LCDDAT	; print chr on LCD
+0086   0067 19          	inc r1		; text index++
+0087   0068 04 61       	jmp p_1		; naechstes Zeichen
+0088   006A             	
+0089   006A 34 ED       x1	call I2CSTOP	; stop I2C sequence
+0090   006C             	
+0091   006C 54 24       x2	call WATCHDOG
+0092   006E             	
+0093   006E 04 6C       	jmp x2
+0094   0070             
+0095   0070             
+0096   0100             .org $0100
+0097   0100             
+0098   0100             
+0099   0100             ;*****************************************
+0100   0100             ; Init sequence LCD 4-bit value
+0101   0100             ; A= LCD 8bit-command
+0102   0100             ; r5= temp Port expander PCF8574
+0103   0100             ;*****************************************
+0104   0100             INITLCD	;*** Init Try 1
+0105   0100 BD 0C       	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
+0106   0102 23 30       	mov a,#$(%00110000) ; Function Set #1, DL=1 8bit datalength
+0107   0104 34 93       	call LCDCMDI	; write high nibble LCD cmd 
+0108   0106             	
+0109   0106 34 9F       	call wait10	; 1*10ms
+0110   0108 54 24       	call WATCHDOG	; trigger P27
+0111   010A             	
+0112   010A             	;*** Init Try 2
+0113   010A BD 0C       	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
+0114   010C 23 30       	mov a,#$(%00110000) ; Function Set #2, DL=1 8bit datalength
+0115   010E 34 93       	call LCDCMDI	; write high nibble LCD cmd 
+0116   0110             	
+0117   0110 34 9F       	call wait10	; 1*10ms
+0118   0112 54 24       	call WATCHDOG	; trigger P27
+0119   0114             	
+0120   0114             	;*** Init Try 3
+0121   0114 BD 0C       	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
+0122   0116 23 30       	mov a,#$(%00110000) ; Function Set #3, DL=1 8bit datalength
+0123   0118 34 93       	call LCDCMDI	; write high nibble LCD cmd 
+0124   011A             	
+0125   011A 34 9F       	call wait10	; 1*10ms
+0126   011C 54 24       	call WATCHDOG	; trigger P27
+0127   011E             	
+0128   011E             	; Init set 4bit mode
+0129   011E BD 0C       	mov r5,#EXPWRCMD ; preset P0-P3 expander, K=1, E=1, RW=0, RS=0
+0130   0120 23 2C       	mov a,#$(%00101100) ; Function Set, DL=0 4bit datalength, E=1, RS=0
+0131   0122 34 93       	call LCDCMDI	; write high nibble LCD cmd 
+0132   0124             	
+0133   0124 34 9F       	call wait10	; 1*10ms
+0134   0126 54 24       	call WATCHDOG	; trigger P27
+0135   0128             	
+0136   0128             	;***** valid Init sequence
+0137   0128             	; set 'Function Set'
+0138   0128 23 28       	mov a,#$(%00101000) ; Function set: DL=0 4bit, N=1 2lines, F=0 5x7 dots
+0139   012A 34 79       	call LCDCMD	; write 8-bit LCD command
+0140   012C             	
+0141   012C 34 9F       	call wait10	; 1*10ms
+0142   012E 54 24       	call WATCHDOG	; trigger P27
+0143   0130             	
+0144   0130             	; set 'Display Control'
+0145   0130 23 0C       	mov a,#$(%00001100) ; display control: D=1 display on, C=0 cursor off, B=0 blink cursor off
+0146   0132 34 79       	call LCDCMD	; write 8-bit LCD command
+0147   0134             	
+0148   0134 34 9F       	call wait10	; 1*10ms
+0149   0136 54 24       	call WATCHDOG	; trigger P27
+0150   0138             	
+0151   0138             	; set 'Clear Control'
+0152   0138 23 01       	mov a,#$(%00000001) ; clear display
+0153   013A 34 79       	call LCDCMD	; write 8-bit LCD command
+0154   013C             	
+0155   013C 34 9F       	call wait10	; 1*10ms
+0156   013E 54 24       	call WATCHDOG	; trigger P27
+0157   0140             	
+0158   0140             	; set 'Entry mode'
+0159   0140 23 06       	mov a,#$(%00000110) ; entry mode: I/D=1 increment, S=0 with display shift no
+0160   0142 34 79       	call LCDCMD	; write 8-bit LCD command
+0161   0144             	
+0162   0144 34 9F       	call wait10	; 1*10ms
+0163   0146 54 24       	call WATCHDOG	; trigger P27
+0164   0148             	
+0165   0148             	; set 'Cursor At Home'
+0166   0148 23 02       	mov a,#$(%00000010) ; 'Cursor At Home'
+0167   014A 34 79       	call LCDCMD	; write 8-bit LCD command
+0168   014C             	
+0169   014C 34 9F       	call wait10	; 1*10ms
+0170   014E 54 24       	call WATCHDOG	; trigger P27
+0171   0150             	
+0172   0150 83          	ret		;bye
+0173   0151             
+0174   0151             
+0175   0151             ;*****************************************
+0176   0151             ; Set CG/DD RAM address only, Write LCD 4-bit value
+0177   0151             ; A= CG/DD LCD 8bit-RAM address
+0178   0151             ; r5= temp Port expander PCF8574
+0179   0151             ; r6= temp LCD 8bit-value
+0180   0151             ;*****************************************
+0181   0151 43 40       LCDCGR	orl a,#$(%01000000)
+0182   0153 24 57       	jmp LCDR
+0183   0155 43 80       LCDDDR	orl a,#$(%10000000)
+0184   0157             	
+0185   0157 BD 0C       LCDR	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
+0186   0159             	
+0187   0159             	; set high nibble LCD command
+0188   0159 AE          	mov r6,a	; store full 8-bit LCD-value
+0189   015A 53 F0       	anl a,#$F0	; cut low nibble from LCD-value
+0190   015C 6D          	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
+0191   015D AD          	mov r5,a	; store expander full 8-bit port
+0192   015E 34 C8       	call I2COUT	; write to I2C
+0193   0160 FD          	mov a,r5	; load expander full 8-bit
+0194   0161 53 FB       	anl a,#$(%11111011) ; falling edge E=0
+0195   0163 34 C8       	call I2COUT	; write to I2C
+0196   0165             	
+0197   0165             	; set low nibble LCD command
+0198   0165 FE          	mov a,r6	; load full 8-bit LCD-value
+0199   0166 47          	swap a		; xchange nibble, low -> high
+0200   0167 AE          	mov r6,a	; store modified full 8bit LCD-value
+0201   0168 FD          	mov a,r5	; load expander full 8-bit
+0202   0169 53 0F       	anl a,#$0f	; extract K, E, RW, RS
+0203   016B AD          	mov r5,a	; store P0-P3 expander, (K, E, RW, RS)
+0204   016C FE          	mov a,r6	; load full 8-bit LCD-value
+0205   016D 53 F0       	anl a,#$F0	; cut low nibble LCD-value
+0206   016F 6D          	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
+0207   0170 AD          	mov r5,a	; store expander full 8-bit
+0208   0171 34 C8       	call I2COUT	; write to I2C
+0209   0173 FD          	mov a,r5	; load expander full 8-bit
+0210   0174 53 FB       	anl a,#$(%11111011) ; falling edge E=0
+0211   0176 34 C8       	call I2COUT	; write to I2C
+0212   0178 83          	ret		; bye
+0213   0179             
+0214   0179             
+0215   0179             ;*****************************************
+0216   0179             ; Write LCD 4-bit value
+0217   0179             ; A= LCD 8bit-command
+0218   0179             ; r5= temp Port expander PCF8574
+0219   0179             ; r6= temp LCD 8bit-value
+0220   0179             ;*****************************************
+0221   0179 BD 0C       LCDCMD	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
+0222   017B 24 7F       	jmp LCD		;
+0223   017D BD 0D       LCDDAT	mov r5,#EXPWRDAT ; P0-P3 expander, K=1, E=1, RW=0, RS=1
+0224   017F             	
+0225   017F             	; set high nibble LCD command
+0226   017F AE          LCD	mov r6,a	; store full 8-bit LCD-value
+0227   0180 53 F0       	anl a,#$F0	; cut low nibble from LCD-value
+0228   0182 6D          	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
+0229   0183 AD          	mov r5,a	; store expander full 8-bit port
+0230   0184 34 C8       	call I2COUT	; write to I2C
+0231   0186 FD          	mov a,r5	; load expander full 8-bit
+0232   0187 53 FB       	anl a,#$(%11111011) ; falling edge E=0
+0233   0189 34 C8       	call I2COUT	; write to I2C
+0234   018B             	
+0235   018B             	; set low nibble LCD command
+0236   018B FE          	mov a,r6	; load full 8-bit LCD-value
+0237   018C 47          	swap a		; xchange nibble, low -> high
+0238   018D AE          	mov r6,a	; store modified full 8bit LCD-value
+0239   018E FD          	mov a,r5	; load expander full 8-bit
+0240   018F 53 0F       	anl a,#$0f	; extract K, E, RW, RS
+0241   0191 AD          	mov r5,a	; store P0-P3 expander, (K, E, RW, RS)
+0242   0192 FE          	mov a,r6	; load full 8-bit LCD-value
+0243   0193 53 F0       LCDCMDI	anl a,#$F0	; cut low nibble LCD-value
+0244   0195 6D          	add a,r5	; add P0-P3 expander, (K, E, RW, RS)
+0245   0196 AD          	mov r5,a	; store expander full 8-bit
+0246   0197 34 C8       	call I2COUT	; write to I2C
+0247   0199 FD          	mov a,r5	; load expander full 8-bit
+0248   019A 53 FB       	anl a,#$(%11111011) ; falling edge E=0
+0249   019C 34 C8       	call I2COUT	; write to I2C
+0250   019E 83          	ret		; bye
+0251   019F             
+0252   019F             
+0253   019F             ;;*****************************************
+0254   019F             ;; Write LCD 4-bit command
+0255   019F             ;; A= LCD 8bit-command
+0256   019F             ;; r5= temp Port expander PCF8574
+0257   019F             ;; r6= temp LCD 8bit-command
+0258   019F             ;;*****************************************
+0259   019F             ;LCDCMD
+0260   019F             ;	; set high nibble LCD command
+0261   019F             ;	mov r6,a	; store 8-bit LCD-CMD
+0262   019F             ;	anl a,#$F0	; cut low nibble LCD-CMD
+0263   019F             ;	add a,#EXPWRCMD ; add P0-P3 expander, K=1, E=1, RW=0, RS=0
+0264   019F             ;	mov r5,a	; store expander 8-bit
+0265   019F             ;	call I2COUT	;
+0266   019F             ;	mov a,r5	; load expander 8-bit
+0267   019F             ;	anl a,#$(%11111011) ; E=0
+0268   019F             ;	call I2COUT	;
+0269   019F             ;	
+0270   019F             ;	; set low nibble LCD command
+0271   019F             ;	mov a,r6	; load 8-bit LCD-CMD
+0272   019F             ;	swap a		; xchange nibble, low -> high
+0273   019F             ;LCDCMDI	anl a,#$F0	; cut low nibble LCD-CMD
+0274   019F             ;	add a,#EXPWRCMD	; add P0-P3 expander, K=1, E=1, RW=0, RS=0
+0275   019F             ;	mov r5,a	; store expander 8-bit
+0276   019F             ;	call I2COUT	;
+0277   019F             ;	mov a,r5	; load expander 8-bit
+0278   019F             ;	anl a,#$(%11111011) ; E=0
+0279   019F             ;	call I2COUT	;
+0280   019F             ;	ret		;
+0281   019F             ;
+0282   019F             ;
+0283   019F             ;;*****************************************
+0284   019F             ;; Write LCD 4-bit data
+0285   019F             ;; A= LCD 8bit-data
+0286   019F             ;; r5= temp Port expander PCF8574
+0287   019F             ;; r6= temp LCD 8bit-command
+0288   019F             ;;*****************************************
+0289   019F             ;LCDDAT
+0290   019F             ;	; set high nibble LCD command
+0291   019F             ;	mov r6,a	; store 8-bit LCD-CMD
+0292   019F             ;	anl a,#$F0	; cut low nibble LCD-CMD
+0293   019F             ;	add a,#EXPWRDAT ; add P0-P3 expander, K=1, E=1, RW=0, RS=1
+0294   019F             ;	mov r5,a	; store expander 8-bit
+0295   019F             ;	call I2COUT	;
+0296   019F             ;	mov a,r5	; load expander 8-bit
+0297   019F             ;	anl a,#$(%11111011) ; E=0
+0298   019F             ;	call I2COUT	;
+0299   019F             ;	
+0300   019F             ;	; set low nibble LCD command
+0301   019F             ;	mov a,r6	; load 8-bit LCD-CMD
+0302   019F             ;	swap a		; xchange nibble, low -> high
+0303   019F             ;	anl a,#$F0	; cut low nibble LCD-CMD
+0304   019F             ;	add a,#EXPWRDAT	; add P0-P3 expander, K=1, E=1, RW=0, RS=1
+0305   019F             ;	mov r5,a	; store expander 8-bit
+0306   019F             ;	call I2COUT	;
+0307   019F             ;	mov a,r5	; load expander 8-bit
+0308   019F             ;	anl a,#$(%11111011) ; E=0
+0309   019F             ;	call I2COUT	;
+0310   019F             ;	ret		;
+0311   019F             
+0312   019F             
+0313   019F             ;*****************************************
+0314   019F             ; sekunde                                *
+0315   019F             ; Da aufwaertszahler, muss die diff zum  *
+0316   019F             ; ueberlauf als Wert gtenommen werden    *
+0317   019F             ; r4= n * 10ms
+0318   019F             ;*****************************************
+0319   019F BC 01       wait10		mov r4,#$01	; 1*10ms
+0320   01A1 23 B3       wait		mov a,#0b3h	; (1 cyc) 9,895 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
+0321   01A3 62          		mov t,a		; (1 cyc) timer mit akkuwert laden
+0322   01A4 54 24       t_start		call WATCHDOG	;
+0323   01A6 55          		strt t		; (1 cyc) timer starten
+0324   01A7 16 AB       sek_2		jtf sek_3	; (2 cyc) timer abgelaufen
+0325   01A9 24 A7       		jmp sek_2	; (2 cyc) warten bis timer abgelaufen
+0326   01AB 65          sek_3		stop tcnt	; (1 cyc) timer anhalten
+0327   01AC EC A1       		djnz r4,wait	; (2 cyc) repeat zaehler decrementieren
+0328   01AE 83          		ret		; (2 cyc) bye
+0329   01AF             
+0330   01AF             
+0331   01AF             ;*****************************************
+0332   01AF             ; I2C read data
+0333   01AF             ; SDA & SCL should be low before
+0334   01AF             ; r0= temp bitcounter
+0335   01AF             ; r3= temp data
+0336   01AF             ; A=  data
+0337   01AF             ;*****************************************
+0338   01AF             I2CIN
+0339   01AF             	; SDA & SCL should here be low
+0340   01AF B8 08       	mov r0,#$08	; set bitcounter to 8-bit
+0341   01B1             	
+0342   01B1             	; loop over 8-bit data
+0343   01B1             I2CO01	
+0344   01B1 89 01       	orl p1,#$(1 << SCL) ; SCL high, clock rising
+0345   01B3 09          	in a,p1		; read P1x (SDA)
+0346   01B4 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
+0347   01B6             	
+0348   01B6 97          	clr c		; C=0
+0349   01B7 32 BB       	jb1 I2CO02	; SDA=1 (P1x)
+0350   01B9 24 BC       	jmp I2CO03	; SDA=0 (P1x)
+0351   01BB A7          I2CO02	cpl c		; C=1
+0352   01BC             	
+0353   01BC FB          I2CO03	mov a,r3	; lopad temp data
+0354   01BD F7          	rlc a		; shift carry into A
+0355   01BE AB          	mov r3,a	; save temp data
+0356   01BF             	
+0357   01BF E8 B1       	djnz r0,I2CO01	; decrement bitcounter,next loop r0>0
+0358   01C1             	
+0359   01C1             	; check bit-9 AKN/NAKN
+0360   01C1 89 01       	orl p1,#$(1 << SCL) ; SCL high, clock rising
+0361   01C3 09          	in a,p1		; read P1x
+0362   01C4 00          	nop		; carry to be define
+0363   01C5 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
+0364   01C7             	
+0365   01C7 83          	ret
+0366   01C8             
+0367   01C8             
+0368   01C8             ;*****************************************
+0369   01C8             ; I2C write out address/date
+0370   01C8             ; SDA & SCL should be low before
+0371   01C8             ; data must be stable before and after clock
+0372   01C8             ; A= address/data -> R3
+0373   01C8             ; r0= temp bitcounter
+0374   01C8             ; r3= temp address/data
+0375   01C8             ;*****************************************
+0376   01C8             I2COUT	; SDA & SCL should here be low
+0377   01C8             	
+0378   01C8 B8 08       	mov r0,#$08	; set bitcounter to 8-bit
+0379   01CA             	
+0380   01CA             	; loop over 8-bit adress+RW/data
+0381   01CA AB          I2CB01	mov r3,a	; set A to temp adress/data
+0382   01CB 97          	clr c		; prerpare carry
+0383   01CC FB          	mov a,r3	; load temp adress/data
+0384   01CD F7          	rlc a		; shift bit out into carry
+0385   01CE F6 D2       	jc I2CB1	; bit set
+0386   01D0 24 D4       	jmp I2CB2	; bit clear
+0387   01D2 89 02       I2CB1	orl p1,#$(1 << SDA) ; SDA high, bit rising
+0388   01D4 89 01       I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
+0389   01D6 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
+0390   01D8 99 FD       	anl p1,#~(1 << SDA) ; SDA low, bit falling
+0391   01DA E8 CA       	djnz r0,I2CB01	; decrement bitcounter,next loop r0>0
+0392   01DC             	
+0393   01DC             	; check bit-9 AKN/NAKN
+0394   01DC 89 01       	orl p1,#$(1 << SCL) ; SCL high, clock rising
+0395   01DE 09          	in a,p1		; read P1x
+0396   01DF 00          	nop		; carry to be define
+0397   01E0 99 FE       	anl p1,#~(1 << SCL) ; SCL low, clock falling
+0398   01E2             	
+0399   01E2 83          	ret
+0400   01E3             
+0401   01E3             
+0402   01E3             ;;*****************************************
+0403   01E3             ;; I2C write out address/date
+0404   01E3             ;; SDA & SCL should be low before
+0405   01E3             ;; data must be stable before and after clock
+0406   01E3             ;; A= address/data -> R3
+0407   01E3             ;; r0= temp bitcounter
+0408   01E3             ;; r3= temp address/data
+0409   01E3             ;; F0= R/W 1/0
+0410   01E3             ;; F1= address/data 1/0
+0411   01E3             ;;*****************************************
+0412   01E3             ;I2COUT
+0413   01E3             ;	mov r0,#$08	; set bitcounter to 8-bit
+0414   01E3             ;	jf1 I2CB00	; F1=1 7-bit address mode + 1-bit RW
+0415   01E3             ;	jmp I2CB01	; F1=0 8-bit data mode
+0416   01E3             ;	
+0417   01E3             ;	; adapt to address + R/W
+0418   01E3             ;I2CB00	rl a		; convert A to address << 1 and b0=0 (write)
+0419   01E3             ;	jf0 I2CB00A	; read mode
+0420   01E3             ;	jmp I2CB01	; write mode
+0421   01E3             ;I2CB00A	orl a,#$01	; b0=1 (read)
+0422   01E3             ;	
+0423   01E3             ;	; SDA & SCL should here be low
+0424   01E3             ;	; loop over 8-bit adress+RW/data
+0425   01E3             ;I2CB01	mov r3,a	; set A to temp adress/data
+0426   01E3             ;	clr c		; prerpare carry
+0427   01E3             ;	mov a,r3	; load temp adress/data
+0428   01E3             ;	rlc a		; shift bit out into carry
+0429   01E3             ;	jc I2CB1	; bit set
+0430   01E3             ;	jmp I2CB2	; bit clear
+0431   01E3             ;I2CB1	orl p1,#$(1 << SDA) ; SDA high, bit rising
+0432   01E3             ;I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
+0433   01E3             ;	anl p1,#~(1 << SCL) ; SCL low, clock falling
+0434   01E3             ;	anl p1,#~(1 << SDA) ; SDA low, bit falling
+0435   01E3             ;	djnz r0,I2CB01	; decrement bitcounter,next loop r0>0
+0436   01E3             ;	
+0437   01E3             ;	; check bit-9 AKN/NAKN
+0438   01E3             ;	orl p1,#$(1 << SCL) ; SCL high, clock rising
+0439   01E3             ;	in a,p1		; read P1x
+0440   01E3             ;	nop		; carry to be define
+0441   01E3             ;	anl p1,#~(1 << SCL) ; SCL low, clock falling
+0442   01E3             ;	
+0443   01E3             ;	ret
+0444   01E3             
+0445   01E3             
+0446   01E3             ;*****************************************
+0447   01E3             ; I2C init sequence
+0448   01E3             ;*****************************************
+0449   01E3             I2CINIT	
+0450   01E3 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
+0451   01E5 83          	ret
+0452   01E6             
+0453   01E6             
+0454   01E6             ;*****************************************
+0455   01E6             ; I2C start sequence
+0456   01E6             ; SDA & SCL should be low before
+0457   01E6             ;*****************************************
+0458   01E6             I2CSTART
+0459   01E6 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
+0460   01E8 99 FD       	anl p1,#~(1 << SDA)		; SDA low, SCL high
+0461   01EA 99 FC       	anl p1,#~((1 << SDA)|(1 << SCL)) ; SDA & SCL low
+0462   01EC 83          	ret				;
+0463   01ED             
+0464   01ED             
+0465   01ED             ;*****************************************
+0466   01ED             ; I2C start sequence
+0467   01ED             ; SDA & SCL should be low before
+0468   01ED             ;*****************************************
+0469   01ED             I2CSTOP
+0470   01ED             	;in a,p1
+0471   01ED             	;outl p1,a
+0472   01ED 89 01       	orl p1,#$(1 << SCL)		; SCL high
+0473   01EF 00          	nop
+0474   01F0 00          	nop
+0475   01F1 89 03       	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
+0476   01F3 00          	nop
+0477   01F4 83          	ret				;
+0478   01F5             
+0479   01F5             
+0480   0200             .org $0200
+0481   0200             
+0482   0200              ;************************************************
+0483   0200             ; Load SW1/SW2
+0484   0200             ; R3/R4= temporary result of SW1/SW2
+0485   0200             ; $20= result of SW1
+0486   0200             ; $21= result of SW2
+0487   0200             ;************************************************
+0488   0200             rdSW12:
+0489   0200 23 10       	mov	a,#$10		; init value-corunter
+0490   0202 AA          	mov	r2,a		; with %00010000
+0491   0203             L0332:
+0492   0203 FB          	mov	a,r3		; move SW counter from r3
+0493   0204 AC          	mov	r4,a		; to SW counter r4
+0494   0205             L0334:
+0495   0205 CA          	dec	r2		; value-counter r2--
+0496   0206 09          	in	a,p1		; load current value of port1
+0497   0207 53 F0       	anl	a,#$F0		; cut low nibble
+0498   0209 4A          	orl	a,r2		; "add" value-counter r2 into
+0499   020A 39          	outl	p1,a		; write back to port1
+0500   020B FB          	mov	a,r3		; load A with r3
+0501   020C 97          	clr	c		; clear carry
+0502   020D 56 10       	jt1	L033F		; SW is "On"?
+0503   020F A7          	cpl	c		; set carry (inverted val)
+0504   0210             L033F:
+0505   0210 F7          	rlc	a		; fill value with carry from right
+0506   0211 AB          	mov	r3,a		; store result to counter r3
+0507   0212 FA          	mov	a,r2		; load counter r2
+0508   0213 72 03       	jb3	L0332		; bit 3 set (SW2 active)?
+0509   0215 53 0F       	anl	a,#$0F		; cut high nibble
+0510   0217 C6 1B       	jz	L034A		; value-counter clear
+0511   0219 44 05       	jmp	L0334		; next loop, SW counter -> r4
+0512   021B             L034A:
+0513   021B B8 20       	mov	r0,#ZP_SW1	; set index ZP $20
+0514   021D FB          	mov	a,r3		; store result from r3
+0515   021E A0          	mov	@r0,a		; to RAM $20
+0516   021F B8 21       	mov	r0,#ZP_SW2	; set index ZP $21
+0517   0221 FC          	mov	a,r4		; store result from r4
+0518   0222 A0          	mov	@r0,a		; to RAM $21
+0519   0223 83          	ret			; bye
+0520   0224             
+0521   0224             
+0522   0224             ;*****************************************
+0523   0224             ; watchdog impuls |_|- high->low -> high *
+0524   0224             ; must be execute at least each ~630ms   *
+0525   0224             ;*****************************************
+0526   0224             WATCHDOG:
+0527   0224 9A 7F       	anl p2,#$(~b_WD)	; (2 cyc) P27 Watchdog low
+0528   0226 8A 80       	orl p2,#b_WD		; (2 cyc) P27 Watchdog high
+0529   0228 83          	ret			; (2 cyc)
+0530   0229             
+0531   0229             
+0532   0229             
+0533   0229             ;***********************************************
+0534   0229             ; Timer interrupt routine alle 10,02 ms        *
+0535   0229             ;***********************************************
+0536   0229             TIMERINT:
+0537   0229 93          	retr
+0538   022A             	
+0539   022A             	
+0540   022A 23 B3       	mov a,#0b3h		; (1 cyc) 9,8 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
+0541   022C 62          	mov t,a			; (1 cyc) timer mit akkuwert laden
+0542   022D 09          	in a,p1			; (2 cyc) lese port #1 in kku
+0543   022E D3 80       	xrl a,#b_WD		; (2 cyc) XOR akku mit bit 7
+0544   0230 39          	outl p1,a		; (2 cyc) schreibe akku nach port #1
+0545   0231 93          	retr			; (2 cyc) return mit PSW restore
+0546   0232             
+0547   0232             ;***********************************************
+0548   0232             ; interrupt routine                            *
+0549   0232             ;***********************************************
+0550   0232             INTERRUPT:
+0551   0232 93          	retr			;
+0552   0233             
+0553   0233             
+0554   0300             .org $0300
+0555   0300             	;      0123456789abcdef
+0556   0300 48 61 6C 6C 	.text "Hallo Andreas "
+0556   0304 6F 20 41 6E 
+0556   0308 64 72 65 61 
+0556   030C 73 20 
+0557   030E 01          	.byte 01h
+0558   030F 02          	.byte 02h
+0559   0310 00          	.byte 00h
+0560   0311             
+0561   0311             
+0562   0311             .end
+0563   0311             
 
 
 
@@ -608,35 +626,38 @@ Value    Type   Label
 004F     N      I2CLCDRD                        
 0020     N      INIT                            
 0100     N      INITLCD                         
-0187     N      I2CIN                           
-0189     N      I2CO01                          
-0193     N      I2CO02                          
-0194     N      I2CO03                          
-01A0     N      I2COUT                          
-01A2     N      I2CB01                          
-01AA     N      I2CB1                           
-01AC     N      I2CB2                           
-01BB     N      I2CINIT                         
-01BE     N      I2CSTART                        
-01C5     N      I2CSTOP                         
-01FF     N      INTERRUPT                       
+01AF     N      I2CIN                           
+01B1     N      I2CO01                          
+01BB     N      I2CO02                          
+01BC     N      I2CO03                          
+01C8     N      I2COUT                          
+01CA     N      I2CB01                          
+01D2     N      I2CB1                           
+01D4     N      I2CB2                           
+01E3     N      I2CINIT                         
+01E6     N      I2CSTART                        
+01ED     N      I2CSTOP                         
+0232     N      INTERRUPT                       
 0003     N      K                               
 000A     N      LF                              
-0151     N      LCDCMD                          
-0155     N      LCDDAT                          
-0157     N      LCD                             
-016B     N      LCDCMDI                         
-01D0     N      L0332                           
-01D2     N      L0334                           
-01DD     N      L033F                           
-01E8     N      L034A                           
+0151     N      LCDCGR                          
+0155     N      LCDDDR                          
+0157     N      LCDR                            
+0179     N      LCDCMD                          
+017D     N      LCDDAT                          
+017F     N      LCD                             
+0193     N      LCDCMDI                         
+0203     N      L0332                           
+0205     N      L0334                           
+0210     N      L033F                           
+021B     N      L034A                           
 0000     N      NUL                             
 0000     N      RS                              
 0001     N      RW                              
 0000     N      SCL                             
 0001     N      SDA                             
-01F6     N      TIMERINT                        
-01F1     N      WATCHDOG                        
+0229     N      TIMERINT                        
+0224     N      WATCHDOG                        
 0020     N      ZP_SW1                          
 0021     N      ZP_SW2                          
 0022     N      ZP_22                           
@@ -648,27 +669,27 @@ Value    Type   Label
 0000     NL     noname._RESET                   
 0003     NL     noname._INT                     
 0007     NL     noname._TINT                    
-0037     N      p_1                             
-01CD     N      rdSW12                          
-017F     N      sek_2                           
-0183     N      sek_3                           
-017C     N      t_start                         
-0177     N      wait10                          
-0179     N      wait                            
+0061     N      p_1                             
+0200     N      rdSW12                          
+01A7     N      sek_2                           
+01AB     N      sek_3                           
+01A4     N      t_start                         
+019F     N      wait10                          
+01A1     N      wait                            
 0027     N      x0                              
-0040     N      x1                              
-0042     N      x2                              
+006A     N      x1                              
+006C     N      x2                              
 
 
 ADDR  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
 -----------------------------------------------------
-0000  04 20 00 24 FF 00 00 24 F6 00 FF FF FF FF FF FF
+0000  04 20 00 44 32 00 00 44 29 00 FF FF FF FF FF FF
 0010  30 31 32 33 34 35 36 37 38 39 61 62 63 64 65 66
-0020  15 35 75 34 BB 34 F1 34 BE 23 4E 34 A0 34 00 BC
-0030  0A 34 77 34 F1 B9 00 F9 E3 C6 40 34 55 19 04 37
-0040  34 C5 34 F1 04 42 23 40 34 55 23 20 34 55 23 41
-0050  34 55 23 6E 34 55 23 64 34 55 23 72 34 55 23 65
-0060  34 55 23 61 34 55 23 73 34 55 FF FF FF FF FF FF
+0020  15 35 75 34 E3 54 24 34 E6 23 4E 34 C8 34 00 BC
+0030  0A 34 9F 54 24 23 08 34 51 23 81 34 7D 23 42 34
+0040  7D 23 24 34 7D 23 18 34 7D 23 18 34 7D 23 04 34
+0050  7D 23 0A 34 7D 23 11 34 7D 23 45 34 55 54 24 B9
+0060  00 F9 E3 C6 6A 34 7D 19 04 61 34 ED 54 24 04 6C
 0070  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 0080  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 0090  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
@@ -678,26 +699,26 @@ ADDR  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
 00D0  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 00E0  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 00F0  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-0100  BD 0C 23 30 34 6B 34 77 34 F1 BD 0C 23 30 34 6B
-0110  34 77 34 F1 BD 0C 23 30 34 6B 34 77 34 F1 BD 0C
-0120  23 2C 34 6B 34 77 34 F1 23 28 34 51 34 77 34 F1
-0130  23 0C 34 51 34 77 34 F1 23 01 34 51 34 77 34 F1
-0140  23 06 34 51 34 77 34 F1 23 02 34 51 34 77 34 F1
-0150  83 BD 0C 24 57 BD 0D AE 53 F0 6D AD 34 A0 FD 53
-0160  FB 34 A0 FE 47 AE FD 53 0F AD FE 53 F0 6D AD 34
-0170  A0 FD 53 FB 34 A0 83 BC 01 23 B3 62 34 F1 55 16
-0180  83 24 7F 65 EC 79 83 B8 08 89 01 09 99 FE 97 32
-0190  93 24 94 A7 FB F7 AB E8 89 89 01 09 00 99 FE 83
-01A0  B8 08 AB 97 FB F7 F6 AA 24 AC 89 02 89 01 99 FE
-01B0  99 FD E8 A2 89 01 09 00 99 FE 83 89 03 83 89 03
-01C0  99 FD 99 FC 83 89 01 00 00 89 03 00 83 23 10 AA
-01D0  FB AC CA 09 53 F0 4A 39 FB 97 56 DD A7 F7 AB FA
-01E0  72 D0 53 0F C6 E8 24 D2 B8 20 FB A0 B8 21 FC A0
-01F0  83 9A 7F 8A 80 83 93 23 B3 62 09 D3 80 39 93 93
-0200  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-0210  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-0220  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-0230  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
+0100  BD 0C 23 30 34 93 34 9F 54 24 BD 0C 23 30 34 93
+0110  34 9F 54 24 BD 0C 23 30 34 93 34 9F 54 24 BD 0C
+0120  23 2C 34 93 34 9F 54 24 23 28 34 79 34 9F 54 24
+0130  23 0C 34 79 34 9F 54 24 23 01 34 79 34 9F 54 24
+0140  23 06 34 79 34 9F 54 24 23 02 34 79 34 9F 54 24
+0150  83 43 40 24 57 43 80 BD 0C AE 53 F0 6D AD 34 C8
+0160  FD 53 FB 34 C8 FE 47 AE FD 53 0F AD FE 53 F0 6D
+0170  AD 34 C8 FD 53 FB 34 C8 83 BD 0C 24 7F BD 0D AE
+0180  53 F0 6D AD 34 C8 FD 53 FB 34 C8 FE 47 AE FD 53
+0190  0F AD FE 53 F0 6D AD 34 C8 FD 53 FB 34 C8 83 BC
+01A0  01 23 B3 62 54 24 55 16 AB 24 A7 65 EC A1 83 B8
+01B0  08 89 01 09 99 FE 97 32 BB 24 BC A7 FB F7 AB E8
+01C0  B1 89 01 09 00 99 FE 83 B8 08 AB 97 FB F7 F6 D2
+01D0  24 D4 89 02 89 01 99 FE 99 FD E8 CA 89 01 09 00
+01E0  99 FE 83 89 03 83 89 03 99 FD 99 FC 83 89 01 00
+01F0  00 89 03 00 83 FF FF FF FF FF FF FF FF FF FF FF
+0200  23 10 AA FB AC CA 09 53 F0 4A 39 FB 97 56 10 A7
+0210  F7 AB FA 72 03 53 0F C6 1B 44 05 B8 20 FB A0 B8
+0220  21 FC A0 83 9A 7F 8A 80 83 93 23 B3 62 09 D3 80
+0230  39 93 93 FF FF FF FF FF FF FF FF FF FF FF FF FF
 0240  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 0250  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 0260  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
@@ -710,7 +731,8 @@ ADDR  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
 02D0  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 02E0  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 02F0  FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
-0300  48 61 6C 6C 6F 20 41 6E 64 72 65 61 73 20 20 00
+0300  48 61 6C 6C 6F 20 41 6E 64 72 65 61 73 20 01 02
+0310  00 FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF
 
 
 tasm: Number of errors = 0
