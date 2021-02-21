@@ -2,3 +2,8 @@
 # ignore ultraedit *.bak files
 *.bak
 
+# MiniPro Eprommer
+*.mpj
+serials.txt
+
+

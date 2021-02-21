@@ -13,5 +13,7 @@ ZP_HNIB	= $24	; high nibble result of 8b
 ZP_25	= $25	; working nibble result
 ZP_26	= $26	; last pressed raw key 7279
 
+ZP_29	= $29	; start textbuffer (2 x textlength)
+
 
 

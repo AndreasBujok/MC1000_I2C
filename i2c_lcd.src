@@ -14,9 +14,21 @@
 #include "i2c.inc";
 #include "lcd_i2c.inc";
 
+#include "macros.inc"
 
+MAJOR	= 2
+MINOR	= 2
+
+;*** Values of freerunning timer interrupt
+Ttick_10ms = 77 ; 10,02 ms/130 us = 77
+Ttick_5ms = 38  ; 4,9 ms /130 us = 38
+Ttick_1ms = 8   ; 1,04 ms / 130 us = 8
+
+Ttime	= Ttick_1ms
+TSCALE	= (256 - Ttime) ; TSCALE + Ttime => Timeroverflow (FF -> 00)
 
 .org 0000h
+
 
 _RESET		jmp INIT	; reset sprungadresse
 		nop
@@ -26,161 +38,181 @@ _INT		jmp INTERRUPT	; interrupt sprungadresse
 _TINT		jmp TIMERINT	; timer interrupt sprungadresse
 		nop
 
+	; ------- MiniPro EPROM ID 16 Byte ------------
 .org 0010h
-	; Platz fuer 16 Byte EPROM ID
-	.byte	"0123456789abcdef"
-	
+	; reserved for MiniPro 16 Byte EPROM ID/sertial numbers
+	; "2021-02-16 16:23"
+ROMDAT	.byte	"2021-xx-xx yy:yy"
+	.byte $00
+
+
 	; ---------------- init --------------------
-INIT	dis i		; (1 cyc) interrupt verhindern
-	dis tcnti	; (1 cyc) timer interrupt verhindern
-	ent0 clk	; (1 cyc) T0 prozessortakt ausgeben
+INIT	dis i		; (1 cyc) disable interrupt
+	en tcnti	; (1 cyc) enable timer interrupt
 	
-	call I2CINIT	; init i2c - SDA and SCL high
+	call I2CINIT
+	mov a,#TSCALE	; load timerinterrupt prescaler
+	mov t,a		; load timer
+	strt t		; start timer
+	ent0 clk	; enable output T0 processor clock
 	
-	call WATCHDOG	; trigger P27
+	call I2CSTART	; I2C start sequence
 	
-x0	call I2CSTART	; start I2C sequence
-	
-	;*** LCD Address
+	;*** set LCD Address
 	mov a,#I2CLCDWR	; i2c 7-bit LCD write address
 	call I2COUT	; write to I2C
 	
-	call INITLCD	; init sequence LCD
+	call INITLCD	; run LCD initsequence
 	
-	mov r4,#$0a	; 10*10ms
-	call wait10	;
-	call WATCHDOG	; trigger P27
+	mov a,#$00	; Zeile 0, Pos 0
+	call LCDPOS	; set cursor position
+	mov a,#$LB(LOGO) ; load start of string
+	call PRINTP3LCD	; print on LCD
 	
+	mov a,#$40	; Zeile 1, Pos 0
+	call LCDPOS	; set cursor position
+	mov a,#$LB(VERSION) ; load start of string
+	call PRINTP3LCD	; print on LCD
+	mov a,#MAJOR	; load major version number
+	add a,#$30	; convert to ASCII
+	call LCDDAT	; print single major version on LCD
+	mov a,#'.'	; load ASCII '.'
+	call LCDDAT	; print on LCD
+	mov a,#MINOR	; load minor version number
+	add a,#$30	; convert to ASCII
+	call LCDDAT	; print single minor version on LCD
 	
-	mov a,#$08
-	call LCDCGR
-	mov a,#$(%10000001)
-	call LCDDAT
-	mov a,#$(%01000010)
-	call LCDDAT
-	mov a,#$(%00100100)
-	call LCDDAT
-	mov a,#$(%00011000)
-	call LCDDAT
-	mov a,#$(%00011000)
-	call LCDDAT
-	mov a,#$(%00000100)
-	call LCDDAT
-	mov a,#$(%00001010)
-	call LCDDAT
-	mov a,#$(%00010001)
-	call LCDDAT
+	call wait10	; wait 10ms
 	
-	mov a,#$05
-	call LCDDDR
+	mov a,#$54	; Zeile 3, Pos 0
+	call LCDPOS	; set cursor position
+	mov a,#$LB(ROM)	; load start of string
+	call PRINTP3LCD	; print on LCD
 	
-	call WATCHDOG	; trigger P27
+	call wait10	; wait 10ms
 	
+	call ROMDAT2LCD	; print timestamp of ROM burning
 	
-	; print text to LCD
-	mov r1,#$00	; set index to 0
-p_1	mov a,r1	; lade text index
+	call wait10	; wait 10ms
+	
+	mov a,#$14	; Zeile 2, Pos 0
+	call LCDPOS	; set cursor position
+	mov a,#$LB(TIMERTICK) ; load start of string
+	call PRINTP3LCD	; print on LCD
+	
+	call wait10	; wait 10ms
+	
+	mov a,#Ttime	; load Ttime
+	add a,#$30	; add P3 textstart
+	call PRINTP3LCD	; print on LCD
+	
+	call I2CSTOP	; I2C stop sequence
+	
+	jmp $		; loop to yourself
+
+
+;*****************************************
+; print string from P3 to LCD            *
+; A= Startaddress of Text within Page3   *
+;*****************************************
+PRINTP3LCD
+	mov r1,a	; set A to textstart
+PP3LCD_1
+	mov a,r1	; lade text index
 	movp3 a,@a	; hole zeichen aus P3, index akku
-	jz x1		; null byte endekennung?
+	jz PP3LCD_2	; null byte endekennung?
 	call LCDDAT	; print chr on LCD
+	call wait10	; wait 10ms
 	inc r1		; text index++
-	jmp p_1		; naechstes Zeichen
-	
-x1	call I2CSTOP	; stop I2C sequence
-	
-x2	call WATCHDOG
-	
-	jmp x2
+	jmp PP3LCD_1	;
+PP3LCD_2
+	ret		;
+
+
+;*****************************************
+; print ROM burning date to LCD          *
+; R1= start of string                    *
+;*****************************************
+ROMDAT2LCD
+	mov r1,#ROMDAT	; set A to textstart within Pge3
+RD1	mov a,r1	; lade text index
+	movp a,@a	; hole zeichen aus ROM, index akku
+	jz RD2		; null byte endekennung?
+	call LCDDAT	; print chr on LCD
+	call wait10	; wait 10ms
+	inc r1		; text index++
+	jmp RD1		; loop
+RD2	ret		; Bye
 
 
 .org $0100
 
 
 ;*****************************************
-; Init sequence LCD 4-bit value
-; A= LCD 8bit-command
-; r5= temp Port expander PCF8574
+; Init sequence for LCD 4-bit mode       *
 ;*****************************************
 INITLCD	;*** Init Try 1
 	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
 	mov a,#$(%00110000) ; Function Set #1, DL=1 8bit datalength
 	call LCDCMDI	; write high nibble LCD cmd 
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
 	;*** Init Try 2
 	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
 	mov a,#$(%00110000) ; Function Set #2, DL=1 8bit datalength
 	call LCDCMDI	; write high nibble LCD cmd 
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
 	;*** Init Try 3
 	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
 	mov a,#$(%00110000) ; Function Set #3, DL=1 8bit datalength
 	call LCDCMDI	; write high nibble LCD cmd 
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
 	; Init set 4bit mode
 	mov r5,#EXPWRCMD ; preset P0-P3 expander, K=1, E=1, RW=0, RS=0
 	mov a,#$(%00101100) ; Function Set, DL=0 4bit datalength, E=1, RS=0
 	call LCDCMDI	; write high nibble LCD cmd 
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
-	;***** valid Init sequence
+	;***** start valid Init sequence
 	; set 'Function Set'
 	mov a,#$(%00101000) ; Function set: DL=0 4bit, N=1 2lines, F=0 5x7 dots
 	call LCDCMD	; write 8-bit LCD command
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
 	; set 'Display Control'
 	mov a,#$(%00001100) ; display control: D=1 display on, C=0 cursor off, B=0 blink cursor off
 	call LCDCMD	; write 8-bit LCD command
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
 	; set 'Clear Control'
 	mov a,#$(%00000001) ; clear display
 	call LCDCMD	; write 8-bit LCD command
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
 	; set 'Entry mode'
 	mov a,#$(%00000110) ; entry mode: I/D=1 increment, S=0 with display shift no
 	call LCDCMD	; write 8-bit LCD command
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
 	; set 'Cursor At Home'
 	mov a,#$(%00000010) ; 'Cursor At Home'
 	call LCDCMD	; write 8-bit LCD command
-	
 	call wait10	; 1*10ms
-	call WATCHDOG	; trigger P27
 	
 	ret		;bye
 
 
 ;*****************************************
 ; Set CG/DD RAM address only, Write LCD 4-bit value
-; A= CG/DD LCD 8bit-RAM address
+; A= CG/DD LCD 8bit-RAM address ($00 - $7F) only 
 ; r5= temp Port expander PCF8574
 ; r6= temp LCD 8bit-value
 ;*****************************************
-LCDCGR	orl a,#$(%01000000)
+LCDCGR	orl a,#$(%01000000) ; set CG RAM
 	jmp LCDR
-LCDDDR	orl a,#$(%10000000)
+LCDPOS	orl a,#$(%10000000) ; set DD RAM
 	
 LCDR	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
 	
@@ -250,84 +282,6 @@ LCDCMDI	anl a,#$F0	; cut low nibble LCD-value
 	ret		; bye
 
 
-;;*****************************************
-;; Write LCD 4-bit command
-;; A= LCD 8bit-command
-;; r5= temp Port expander PCF8574
-;; r6= temp LCD 8bit-command
-;;*****************************************
-;LCDCMD
-;	; set high nibble LCD command
-;	mov r6,a	; store 8-bit LCD-CMD
-;	anl a,#$F0	; cut low nibble LCD-CMD
-;	add a,#EXPWRCMD ; add P0-P3 expander, K=1, E=1, RW=0, RS=0
-;	mov r5,a	; store expander 8-bit
-;	call I2COUT	;
-;	mov a,r5	; load expander 8-bit
-;	anl a,#$(%11111011) ; E=0
-;	call I2COUT	;
-;	
-;	; set low nibble LCD command
-;	mov a,r6	; load 8-bit LCD-CMD
-;	swap a		; xchange nibble, low -> high
-;LCDCMDI	anl a,#$F0	; cut low nibble LCD-CMD
-;	add a,#EXPWRCMD	; add P0-P3 expander, K=1, E=1, RW=0, RS=0
-;	mov r5,a	; store expander 8-bit
-;	call I2COUT	;
-;	mov a,r5	; load expander 8-bit
-;	anl a,#$(%11111011) ; E=0
-;	call I2COUT	;
-;	ret		;
-;
-;
-;;*****************************************
-;; Write LCD 4-bit data
-;; A= LCD 8bit-data
-;; r5= temp Port expander PCF8574
-;; r6= temp LCD 8bit-command
-;;*****************************************
-;LCDDAT
-;	; set high nibble LCD command
-;	mov r6,a	; store 8-bit LCD-CMD
-;	anl a,#$F0	; cut low nibble LCD-CMD
-;	add a,#EXPWRDAT ; add P0-P3 expander, K=1, E=1, RW=0, RS=1
-;	mov r5,a	; store expander 8-bit
-;	call I2COUT	;
-;	mov a,r5	; load expander 8-bit
-;	anl a,#$(%11111011) ; E=0
-;	call I2COUT	;
-;	
-;	; set low nibble LCD command
-;	mov a,r6	; load 8-bit LCD-CMD
-;	swap a		; xchange nibble, low -> high
-;	anl a,#$F0	; cut low nibble LCD-CMD
-;	add a,#EXPWRDAT	; add P0-P3 expander, K=1, E=1, RW=0, RS=1
-;	mov r5,a	; store expander 8-bit
-;	call I2COUT	;
-;	mov a,r5	; load expander 8-bit
-;	anl a,#$(%11111011) ; E=0
-;	call I2COUT	;
-;	ret		;
-
-
-;*****************************************
-; sekunde                                *
-; Da aufwaertszahler, muss die diff zum  *
-; ueberlauf als Wert gtenommen werden    *
-; r4= n * 10ms
-;*****************************************
-wait10		mov r4,#$01	; 1*10ms
-wait		mov a,#0b3h	; (1 cyc) 9,895 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
-		mov t,a		; (1 cyc) timer mit akkuwert laden
-t_start		call WATCHDOG	;
-		strt t		; (1 cyc) timer starten
-sek_2		jtf sek_3	; (2 cyc) timer abgelaufen
-		jmp sek_2	; (2 cyc) warten bis timer abgelaufen
-sek_3		stop tcnt	; (1 cyc) timer anhalten
-		djnz r4,wait	; (2 cyc) repeat zaehler decrementieren
-		ret		; (2 cyc) bye
-
-
 ;*****************************************
 ; I2C read data
 ; SDA & SCL should be low before
@@ -393,54 +347,10 @@ I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
 	; check bit-9 AKN/NAKN
 	orl p1,#$(1 << SCL) ; SCL high, clock rising
 	in a,p1		; read P1x
-	nop		; carry to be define
+	nop		; result of AKN/NAKN TBD
 	anl p1,#~(1 << SCL) ; SCL low, clock falling
 	
-	ret
-
-
-;;*****************************************
-;; I2C write out address/date
-;; SDA & SCL should be low before
-;; data must be stable before and after clock
-;; A= address/data -> R3
-;; r0= temp bitcounter
-;; r3= temp address/data
-;; F0= R/W 1/0
-;; F1= address/data 1/0
-;;*****************************************
-;I2COUT
-;	mov r0,#$08	; set bitcounter to 8-bit
-;	jf1 I2CB00	; F1=1 7-bit address mode + 1-bit RW
-;	jmp I2CB01	; F1=0 8-bit data mode
-;	
-;	; adapt to address + R/W
-;I2CB00	rl a		; convert A to address << 1 and b0=0 (write)
-;	jf0 I2CB00A	; read mode
-;	jmp I2CB01	; write mode
-;I2CB00A	orl a,#$01	; b0=1 (read)
-;	
-;	; SDA & SCL should here be low
-;	; loop over 8-bit adress+RW/data
-;I2CB01	mov r3,a	; set A to temp adress/data
-;	clr c		; prerpare carry
-;	mov a,r3	; load temp adress/data
-;	rlc a		; shift bit out into carry
-;	jc I2CB1	; bit set
-;	jmp I2CB2	; bit clear
-;I2CB1	orl p1,#$(1 << SDA) ; SDA high, bit rising
-;I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
-;	anl p1,#~(1 << SCL) ; SCL low, clock falling
-;	anl p1,#~(1 << SDA) ; SDA low, bit falling
-;	djnz r0,I2CB01	; decrement bitcounter,next loop r0>0
-;	
-;	; check bit-9 AKN/NAKN
-;	orl p1,#$(1 << SCL) ; SCL high, clock rising
-;	in a,p1		; read P1x
-;	nop		; carry to be define
-;	anl p1,#~(1 << SCL) ; SCL low, clock falling
-;	
-;	ret
+	ret		; Bye
 
 
 ;*****************************************
@@ -448,33 +358,26 @@ I2CB2	orl p1,#$(1 << SCL) ; SCL high, clock rising
 ;*****************************************
 I2CINIT	
 	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
-	ret
+	ret		; Bye
 
 
 ;*****************************************
 ; I2C start sequence
-; SDA & SCL should be low before
 ;*****************************************
 I2CSTART
 	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
-	anl p1,#~(1 << SDA)		; SDA low, SCL high
+	anl p1,#~(1 << SDA)	; SDA low, SCL high
 	anl p1,#~((1 << SDA)|(1 << SCL)) ; SDA & SCL low
-	ret				;
+	ret		; Bye
 
 
 ;*****************************************
-; I2C start sequence
-; SDA & SCL should be low before
+; I2C stop sequence
 ;*****************************************
 I2CSTOP
-	;in a,p1
-	;outl p1,a
-	orl p1,#$(1 << SCL)		; SCL high
-	nop
-	nop
+	orl p1,#$(1 << SCL)	; SCL high
 	orl p1,#$((1 << SDA)|(1 << SCL)) ; SDA & SCL high
-	nop
-	ret				;
+	ret		; Bye
 
 
 .org $0200
@@ -482,6 +385,7 @@ I2CSTOP
  ;************************************************
 ; Load SW1/SW2
 ; R3/R4= temporary result of SW1/SW2
+; P10-13= used for address counting
 ; $20= result of SW1
 ; $21= result of SW2
 ;************************************************
@@ -529,34 +433,225 @@ WATCHDOG:
 	ret			; (2 cyc)
 
 
+;*****************************************
+; wait 10ms                              *
+; r7 = 1 * 10ms                          *
+;*****************************************
+wait10		mov a,#$(Ttick_10ms / Ttime) ; set timer counter
+		mov r7,a
+wait10a		mov a,r7	; load timer counter, decrement on each TimerInt
+		jnz wait10a	; loop until zero
+		ret		; Bye
 
-;***********************************************
-; Timer interrupt routine alle 10,02 ms        *
-;***********************************************
+
+
+.org $0300
+
+;************************************************
+; load textfile for strings on page3
+;************************************************
+#include "text.inc";
+
+
+.org $0400
+
+;************************************************
+; convert 8bit to ASCII Hex
+; A= 8bit value
+; r0= temp value
+; $22= rescued val of 8bit
+; $23= low nibble 0-F
+; $24= high nibble 0-F
+; $25= temp working nibble result
+;************************************************
+b82HEX:
+	mov	r0,#ZP_22	; set index
+	mov	@r0,a		; rescue 8b value to RAM $22
+	anl	a,#$F0		; cut low nibble
+	swap	a		; swap nibble to create low nibble
+	mov	r0,#ZP_25	; save nibble result
+	mov	@r0,a		; to RAM $25
+	add	a,#$F6		; A = 0-9?
+	jc	L03B5		; A = A-F?
+	mov	r0,#ZP_25	; read nibble result
+	mov	a,@r0		; from RAM $25
+	add	a,#$30		; add '0'
+	mov	r0,#ZP_HNIB	; save 0-9 result
+	mov	@r0,a		; in RAM $23
+	jmp	L03BA		; check 8b low nibble
+L03B5:	add	a,#$41		; add 'A'
+	mov	r0,#ZP_HNIB	; save A-F result
+	mov	@r0,a		; in RAM $23
+L03BA:
+	mov	r0,#ZP_22	; load rescued value
+	mov	a,@r0		; from RAM $22
+	anl	a,#$0F		; cut high nibble
+	mov	r0,#ZP_25	; save nibble result
+	mov	@r0,a		;  to RAM $25
+	add	a,#$F6		; A = 0-9?
+	jc	L03D0		; A = A-F?
+	mov	r0,#ZP_25	; read nibble result
+	mov	a,@r0		; from RAM $25
+	add	a,#$30		; add '0'
+	mov	r0,#ZP_LNIB	; save 0-9 result
+	mov	@r0,a		; in RAM $24
+	jmp	L03D5		; jump to RET
+L03D0:	add	a,#$41		; add 'A'
+	mov	r0,#ZP_LNIB	; save A-F result
+	mov	@r0,a		; in RAM $24
+L03D5:
+	ret			;
+
+
+;*****************************************************
+; Timer interrupt routine, call every timer overflow *
+; decrement r7 until zero on each interrup           *
+;*****************************************************
 TIMERINT:
-	retr
-	
-	
-	mov a,#0b3h		; (1 cyc) 9,8 ms. Da aufwaertszaehler, muss #76 ((255-179) x 130,2 us)
-	mov t,a			; (1 cyc) timer mit akkuwert laden
-	in a,p1			; (2 cyc) lese port #1 in kku
-	xrl a,#b_WD		; (2 cyc) XOR akku mit bit 7
-	outl p1,a		; (2 cyc) schreibe akku nach port #1
-	retr			; (2 cyc) return mit PSW restore
+	sel rb1		; switch to registerbank #1
+	mov r6,a	; rescue akku on registerbank #1
+	sel rb0		; switch to registerbank #0
+	mov a,#TSCALE	; load timer prescale
+	mov t,a		; set timer
+	mov a,r7	; load timertick register
+	jz TIMERINT0	; timer register zero?
+	dec r7		; r7-- decremt timertick register on interrupt/overflow
+TIMERINT0:
+	call WATCHDOG	; P27
+	sel rb1		; switch to registerbank #1
+	mov a,r6	; restore akku back from registerbank #1
+	sel rb0		; switch to registerbank #0
+	retr		;
+
 
 ;***********************************************
 ; interrupt routine                            *
 ;***********************************************
 INTERRUPT:
-	retr			;
+	
+	retr		; (2 cyc) return mit PSW restore
 
 
-.org $0300
-	;      0123456789abcdef
-	.text "Hallo Andreas "
-	.byte 01h
-	.byte 02h
-	.byte 00h
+;**************************************************
+; place for comment out uf code snippets/routines *
+;**************************************************
+;
+;	mov a,#Ttime	; load Ttime
+;	call b82HEX	; convert 8bit into ASCII Hex
+;	mov r0,#$24	; result high nible
+;	mov a,@r0	; load high nibble
+;	call LCDDAT	; print ASCII 0-F on LCD
+;	call wait10	; wait 10ms
+;	mov r0,#$23	; result low nibble
+;	mov a,@r0	; low nibble
+;	call LCDDAT	; print ASCII 0-F on LCD
+;
+;	;*** create textbuffer (size = double of textlength)
+;	; calculate buffer and clrear with whitespace
+;	mov a,#$(LOGO_E - LOGO)
+;	rl a		; make double of textlength
+;	add a,#$STARTTXTBUF ; add address of buffer start
+;	mov r0,a	; store indexcounter max of textbuffer
+;ab0	mov @r0,#' '	; fill whitespace into complete textbuffer
+;	djnz r0,ab0	; index r0--
+;	
+;	; write text into start of textbuffer
+;	mov r0,#$STARTTXTBUF ; set index to start of textbuffer
+;	mov r1,#$0300 - LOGO ; set index to start of text in ROM
+;ab01	mov a,r1	; lade text index
+;	movp3 a,@a	; get char from Page3 of ROM
+;	jz ab2		; zero byte - end of text?
+;	mov @r0,a	; store char into RAM buffer
+;	inc r0		; increment index textbuffer
+;	inc r1		; incremwent index text ROM
+;	jmp ab01	; loop next chr
+;ab2	
+
+;	; print buffer text to LCD
+;	sel rb1
+;	mov r4,#$00	; set bufferpointer to start
+;	mov r1,#$(LOGO_E - LOGO) ; set length of loop
+;	mov r2,#$00	; startindex each loop
+;	
+;ab10	sel rb0
+;	mov a,#$00
+;	call LCDPOS	; set cursor to Address $00
+;	sel rb1
+;	
+;	
+;	mov r5,#$(LOGO_E - LOGO) ; set length of text
+;	
+;ab11	mov a,r4	; load buffer index
+;	add a,#$STARTTXTBUF ; add buffer startaddress RAM
+;	mov r0,a	; store bufferaddress pointer t0 r0
+;	mov a,@r0	; get char from buffer by r0
+;	
+;	sel rb0
+;	call LCDDAT	; print chr on LCD
+;	call wait10
+;	call wait10
+;	call wait10
+;	sel rb1
+;	
+;	inc r4		; buffer pointer++
+;	djnz r5,ab11	; textlength--
+;	
+;	inc r2		; startindex++
+;	mov a,r2	; move startindex
+;	mov r4,a	; to index startbuffer
+;	djnz r1,ab10
+;	
+;	sel rb0
+	
+	
+;	; print text to LCD
+;	mov r1,#$0300 - LOGO	; set index to 0
+;p_1	mov a,r1	; lade text index
+;	movp3 a,@a	; hole zeichen aus P3, index akku
+;	jz x1		; null byte endekennung?
+;	call LCDDAT	; print chr on LCD
+;	
+;	mov r7,#01	; set timercounter 25 * 10 ms = 250ms
+;wait0	mov a,r7	; check timercounter
+;	jnz wait0	; loop until zero
+;	
+;x00	inc r1		; text index++
+;	jmp p_1		; loop next character
+	
+;x1	mov a,#MAJOR
+;	add a,#$30
+;	call LCDDAT	; print chr on LCD
+;	mov a,#'.'
+;	call LCDDAT	; print chr on LCD
+;	mov a,#MINOR
+;	add a,#$30
+;	call LCDDAT	; print chr on LCD
+;	
+;	call I2CSTOP	; stop I2C sequence
+;	
+;x2	nop		;
+;	jmp x2
+
+
+; write bitmap into CGRAM
+;	mov a,#$08
+;	call LCDCGR
+;	mov a,#$(%10000001)
+;	call LCDDAT
+;	mov a,#$(%01000010)
+;	call LCDDAT
+;	mov a,#$(%00100100)
+;	call LCDDAT
+;	mov a,#$(%00011000)
+;	call LCDDAT
+;	mov a,#$(%00011000)
+;	call LCDDAT
+;	mov a,#$(%00000100)
+;	call LCDDAT
+;	mov a,#$(%00001010)
+;	call LCDDAT
+;	mov a,#$(%00010001)
+;	call LCDDAT
 
 
 .end
