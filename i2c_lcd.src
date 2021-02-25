@@ -24,19 +24,19 @@ Ttick_10ms = 77 ; 10,02 ms/130 us = 77
 Ttick_5ms = 38  ; 4,9 ms /130 us = 38
 Ttick_1ms = 8   ; 1,04 ms / 130 us = 8
 
-Ttime	= Ttick_1ms
+Ttime = Ttick_1ms;
 TSCALE	= (256 - Ttime) ; TSCALE + Ttime => Timeroverflow (FF -> 00)
 
 .org 0000h
 
 
-_RESET		jmp INIT	; reset sprungadresse
-		nop
-_INT		jmp INTERRUPT	; interrupt sprungadresse
-		nop
-		nop
-_TINT		jmp TIMERINT	; timer interrupt sprungadresse
-		nop
+_RESET	jmp INIT	; reset sprungadresse
+	nop
+_INT	jmp INTERRUPT	; interrupt sprungadresse
+	nop
+	nop
+_TINT	jmp TIMERINT	; timer interrupt sprungadresse
+	nop
 
 	; ------- MiniPro EPROM ID 16 Byte ------------
 .org 0010h
@@ -51,10 +51,13 @@ INIT	dis i		; (1 cyc) disable interrupt
 	en tcnti	; (1 cyc) enable timer interrupt
 	
 	call I2CINIT
-	mov a,#TSCALE	; load timerinterrupt prescaler
+	
+	mov a,#TSCALE	; load 1ms timerinterrupt prescaler
 	mov t,a		; load timer
 	strt t		; start timer
 	ent0 clk	; enable output T0 processor clock
+	
+	call wait100	; waitstate for LCD power up
 	
 	call I2CSTART	; I2C start sequence
 	
@@ -82,25 +85,25 @@ INIT	dis i		; (1 cyc) disable interrupt
 	add a,#$30	; convert to ASCII
 	call LCDDAT	; print single minor version on LCD
 	
-	call wait10	; wait 10ms
+	call wait001	; wait 1ms
 	
 	mov a,#$54	; Zeile 3, Pos 0
 	call LCDPOS	; set cursor position
 	mov a,#$LB(ROM)	; load start of string
 	call PRINTP3LCD	; print on LCD
 	
-	call wait10	; wait 10ms
+	call wait001	; wait 1ms
 	
 	call ROMDAT2LCD	; print timestamp of ROM burning
 	
-	call wait10	; wait 10ms
+	call wait001	; wait 1ms
 	
 	mov a,#$14	; Zeile 2, Pos 0
 	call LCDPOS	; set cursor position
 	mov a,#$LB(TIMERTICK) ; load start of string
 	call PRINTP3LCD	; print on LCD
 	
-	call wait10	; wait 10ms
+	call wait001	; wait 1ms
 	
 	mov a,#Ttime	; load Ttime
 	add a,#$30	; add P3 textstart
@@ -122,7 +125,7 @@ PP3LCD_1
 	movp3 a,@a	; hole zeichen aus P3, index akku
 	jz PP3LCD_2	; null byte endekennung?
 	call LCDDAT	; print chr on LCD
-	call wait10	; wait 10ms
+	call wait001	; wait 1ms
 	inc r1		; text index++
 	jmp PP3LCD_1	;
 PP3LCD_2
@@ -139,7 +142,7 @@ RD1	mov a,r1	; lade text index
 	movp a,@a	; hole zeichen aus ROM, index akku
 	jz RD2		; null byte endekennung?
 	call LCDDAT	; print chr on LCD
-	call wait10	; wait 10ms
+	call wait001	; wait 1ms
 	inc r1		; text index++
 	jmp RD1		; loop
 RD2	ret		; Bye
@@ -155,51 +158,51 @@ INITLCD	;*** Init Try 1
 	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
 	mov a,#$(%00110000) ; Function Set #1, DL=1 8bit datalength
 	call LCDCMDI	; write high nibble LCD cmd 
-	call wait10	; 1*10ms
+	call wait005	; 5ms
 	
 	;*** Init Try 2
 	mov r5,#EXPWRCMD ; preset for P0-P3 expander, K=1, E=1, RW=0, RS=0
 	mov a,#$(%00110000) ; Function Set #2, DL=1 8bit datalength
 	call LCDCMDI	; write high nibble LCD cmd 
-	call wait10	; 1*10ms
+	call wait001	; 1ms
 	
 	;*** Init Try 3
 	mov r5,#EXPWRCMD ; P0-P3 expander, K=1, E=1, RW=0, RS=0
 	mov a,#$(%00110000) ; Function Set #3, DL=1 8bit datalength
 	call LCDCMDI	; write high nibble LCD cmd 
-	call wait10	; 1*10ms
+	call wait001	; 1ms
 	
 	; Init set 4bit mode
 	mov r5,#EXPWRCMD ; preset P0-P3 expander, K=1, E=1, RW=0, RS=0
 	mov a,#$(%00101100) ; Function Set, DL=0 4bit datalength, E=1, RS=0
 	call LCDCMDI	; write high nibble LCD cmd 
-	call wait10	; 1*10ms
+	call wait001	; 1ms
 	
 	;***** start valid Init sequence
 	; set 'Function Set'
 	mov a,#$(%00101000) ; Function set: DL=0 4bit, N=1 2lines, F=0 5x7 dots
 	call LCDCMD	; write 8-bit LCD command
-	call wait10	; 1*10ms
+	call wait001	; 1ms
 	
 	; set 'Display Control'
 	mov a,#$(%00001100) ; display control: D=1 display on, C=0 cursor off, B=0 blink cursor off
 	call LCDCMD	; write 8-bit LCD command
-	call wait10	; 1*10ms
+	call wait001	; 1ms
 	
 	; set 'Clear Control'
 	mov a,#$(%00000001) ; clear display
 	call LCDCMD	; write 8-bit LCD command
-	call wait10	; 1*10ms
+	call wait001	; 1ms
 	
 	; set 'Entry mode'
 	mov a,#$(%00000110) ; entry mode: I/D=1 increment, S=0 with display shift no
 	call LCDCMD	; write 8-bit LCD command
-	call wait10	; 1*10ms
+	call wait001	; 1ms
 	
 	; set 'Cursor At Home'
 	mov a,#$(%00000010) ; 'Cursor At Home'
 	call LCDCMD	; write 8-bit LCD command
-	call wait10	; 1*10ms
+	call wait001	; 1ms
 	
 	ret		;bye
 
@@ -433,14 +436,25 @@ WATCHDOG:
 	ret			; (2 cyc)
 
 
-;*****************************************
-; wait 10ms                              *
-; r7 = 1 * 10ms                          *
-;*****************************************
-wait10		mov a,#$(Ttick_10ms / Ttime) ; set timer counter
+;********************************************
+; waitXXX only valid when TimerTick running *
+; r7 = 1ms * delay value                    *
+;********************************************
+wait001		mov a,#1 ; set 1*1ms timer counter
 		mov r7,a
-wait10a		mov a,r7	; load timer counter, decrement on each TimerInt
-		jnz wait10a	; loop until zero
+		jmp wait
+wait005		mov a,#5 ; set 5*1ms timer counter
+		mov r7,a
+		jmp wait
+wait010		mov a,#10 ; set 10*1ms timer counter
+		mov r7,a
+		jmp wait
+wait100		mov a,#100 ; set 100*1ms timer counter
+		mov r7,a
+		jmp wait
+		
+wait		mov a,r7	; load timer counter, decrement on each TimerInt
+		jnz wait	; loop until zero
 		ret		; Bye
 
 
@@ -541,7 +555,7 @@ INTERRUPT:
 ;	mov r0,#$24	; result high nible
 ;	mov a,@r0	; load high nibble
 ;	call LCDDAT	; print ASCII 0-F on LCD
-;	call wait10	; wait 10ms
+;	call wait010	; wait 10ms
 ;	mov r0,#$23	; result low nibble
 ;	mov a,@r0	; low nibble
 ;	call LCDDAT	; print ASCII 0-F on LCD
@@ -588,9 +602,9 @@ INTERRUPT:
 ;	
 ;	sel rb0
 ;	call LCDDAT	; print chr on LCD
-;	call wait10
-;	call wait10
-;	call wait10
+;	call wait010
+;	call wait010
+;	call wait010
 ;	sel rb1
 ;	
 ;	inc r4		; buffer pointer++
