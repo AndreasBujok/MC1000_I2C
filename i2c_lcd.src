@@ -67,12 +67,12 @@ INIT	dis i		; (1 cyc) disable interrupt
 	
 	call INITLCD	; run LCD initsequence
 	
-	mov a,#$00	; Zeile 0, Pos 0
+	mov a,#lcd_Line1 ; Zeile 1, Pos 0
 	call LCDPOS	; set cursor position
 	mov a,#$LB(LOGO) ; load start of string
 	call PRINTP3LCD	; print on LCD
 	
-	mov a,#$40	; Zeile 1, Pos 0
+	mov a,#lcd_Line2 ; Zeile 2, Pos 0
 	call LCDPOS	; set cursor position
 	mov a,#$LB(VERSION) ; load start of string
 	call PRINTP3LCD	; print on LCD
@@ -87,7 +87,7 @@ INIT	dis i		; (1 cyc) disable interrupt
 	
 	call wait001	; wait 1ms
 	
-	mov a,#$54	; Zeile 3, Pos 0
+	mov a,#lcd_Line4 ; Zeile 4, Pos 0
 	call LCDPOS	; set cursor position
 	mov a,#$LB(ROM)	; load start of string
 	call PRINTP3LCD	; print on LCD
@@ -98,7 +98,7 @@ INIT	dis i		; (1 cyc) disable interrupt
 	
 	call wait001	; wait 1ms
 	
-	mov a,#$14	; Zeile 2, Pos 0
+	mov a,#lcd_Line3 ; Zeile 3, Pos 0
 	call LCDPOS	; set cursor position
 	mov a,#$LB(TIMERTICK) ; load start of string
 	call PRINTP3LCD	; print on LCD

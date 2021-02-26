@@ -9,5 +9,8 @@ RW	= 1 ; P1 PCF8574, Read/Write
 E	= 2 ; P2 PCF8574, Enable, commit by falling edge
 K	= 3 ; P3 PCF8574, LCD Backlight, K=1 On, K=0 Off
 
-
+lcd_Line1 = $00 ; start of line 1
+lcd_Line2 = $40 ; start of line 2
+lcd_Line3 = $14 ; start of line 3 (20x4)
+lcd_Line4 = $54 ; start of line 4 (20x4)
 

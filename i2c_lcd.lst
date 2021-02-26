@@ -59,8 +59,11 @@
 0009+  0000             E	= 2 ; P2 PCF8574, Enable, commit by falling edge
 0010+  0000             K	= 3 ; P3 PCF8574, LCD Backlight, K=1 On, K=0 Off
 0011+  0000             
-0012+  0000             
-0013+  0000             
+0012+  0000             lcd_Line1 = $00 ; start of line 1
+0013+  0000             lcd_Line2 = $40 ; start of line 2
+0014+  0000             lcd_Line3 = $14 ; start of line 3 (20x4)
+0015+  0000             lcd_Line4 = $54 ; start of line 4 (20x4)
+0016+  0000             
 0016   0000             
 0017   0000             #include "macros.inc"
 0001+  0000             
@@ -120,12 +123,12 @@
 0067   0032             	
 0068   0032 34 00       	call INITLCD	; run LCD initsequence
 0069   0034             	
-0070   0034 23 00       	mov a,#$00	; Zeile 0, Pos 0
+0070   0034 23 00       	mov a,#lcd_Line1 ; Zeile 1, Pos 0
 0071   0036 34 43       	call LCDPOS	; set cursor position
 0072   0038 23 00       	mov a,#$LB(LOGO) ; load start of string
 0073   003A 14 78       	call PRINTP3LCD	; print on LCD
 0074   003C             	
-0075   003C 23 40       	mov a,#$40	; Zeile 1, Pos 0
+0075   003C 23 40       	mov a,#lcd_Line2 ; Zeile 2, Pos 0
 0076   003E 34 43       	call LCDPOS	; set cursor position
 0077   0040 23 15       	mov a,#$LB(VERSION) ; load start of string
 0078   0042 14 78       	call PRINTP3LCD	; print on LCD
@@ -140,7 +143,7 @@
 0087   0054             	
 0088   0054 54 29       	call wait001	; wait 1ms
 0089   0056             	
-0090   0056 23 54       	mov a,#$54	; Zeile 3, Pos 0
+0090   0056 23 54       	mov a,#lcd_Line4 ; Zeile 4, Pos 0
 0091   0058 34 43       	call LCDPOS	; set cursor position
 0092   005A 23 1E       	mov a,#$LB(ROM)	; load start of string
 0093   005C 14 78       	call PRINTP3LCD	; print on LCD
@@ -151,7 +154,7 @@
 0098   0062             	
 0099   0062 54 29       	call wait001	; wait 1ms
 0100   0064             	
-0101   0064 23 14       	mov a,#$14	; Zeile 2, Pos 0
+0101   0064 23 14       	mov a,#lcd_Line3 ; Zeile 3, Pos 0
 0102   0066 34 43       	call LCDPOS	; set cursor position
 0103   0068 23 23       	mov a,#$LB(TIMERTICK) ; load start of string
 0104   006A 14 78       	call PRINTP3LCD	; print on LCD
@@ -807,8 +810,8 @@ Value    Type   Label
 0417     N      L03B5                           
 041C     N      L03BA                           
 0432     N      L03D0                           
-0437     N      L03D5                           
 0002     N      MAJOR                           
+0437     N      L03D5                           
 0002     N      MINOR                           
 0000     N      NUL                             
 0078     N      PRINTP3LCD                      
@@ -844,6 +847,10 @@ Value    Type   Label
 0029     N      ZP_29                           
 0080     N      b_WD                            
 0400     N      b82HEX                          
+0000     N      lcd_Line1                       
+0040     N      lcd_Line2                       
+0014     N      lcd_Line3                       
+0054     N      lcd_Line4                       
 0000     NL     noname._RESET                   
 0003     NL     noname._INT                     
 0007     NL     noname._TINT                    

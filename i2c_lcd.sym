@@ -37,8 +37,8 @@ LOGO              0300
 L03B5             0417
 L03BA             041c
 L03D0             0432
-L03D5             0437
 MAJOR             0002
+L03D5             0437
 MINOR             0002
 NUL               0000
 PRINTP3LCD        0078
@@ -74,6 +74,10 @@ ZP_26             0026
 ZP_29             0029
 b_WD              0080
 b82HEX            0400
+lcd_Line1         0000
+lcd_Line2         0040
+lcd_Line3         0014
+lcd_Line4         0054
 noname._RESET     0000
 noname._INT       0003
 noname._TINT      0007
